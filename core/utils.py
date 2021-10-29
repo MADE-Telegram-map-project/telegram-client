@@ -29,7 +29,6 @@ from telethon.tl.functions.messages import (
     GetRepliesRequest
 )
 
-# https://t.me/latinapopacanski
 
 FullChannelData = namedtuple(
     "FullChannelData", 
@@ -40,9 +39,8 @@ MediaChannelData = namedtuple(
     ("photo", "video", "document", "music", "url", "voice", "gif")
 )
 UserData = namedtuple("UserData", ("user_id", "bot", "username"))
-Message_Data = namedtuple(
-    "Message_Data", 
-    (
+MessageData = namedtuple(
+    "MessageData", (
         "message_id", 
         "id", 
         "text", 
@@ -151,32 +149,34 @@ def is_channel(client, link: str) -> tuple:
     return False, None
 
 
-api_id: int = os.environ["API_ID"]
-api_hash: str = os.environ["API_HASH"]
+if __name__ =="__main__":
+    api_id: int = os.environ["API_ID"]
+    api_hash: str = os.environ["API_HASH"]
 
-name = 'client1'
-client: TelegramClient = None
+    name = 'client1'
+    client: TelegramClient = None
 
-# ch = 19534473280
-# ch = "breakingmash"
-ch = "latinapopacanski"  # 1149710531
-message_id = 2563
+    # https://t.me/latinapopacanski
+    # ch = 19534473280
+    # ch = "breakingmash"
+    ch = "latinapopacanski"  # 1149710531
+    message_id = 2563
 
-with TelegramClient(name, api_id, api_hash) as client:
-    # d = get_header_media_counts(client, ch)
-    # print(d)
-    # print(type(client))
-    get_commenters(client, ch, message_id)
-
-
-    # full = get_channel_full(client, ch)
-    # print(full)
-
-    # print(client.get_input_entity(ch))
-
-    # client.get_entity(1117628569).to_json() # альтернатива получению всей инфы
+    with TelegramClient(name, api_id, api_hash) as client:
+        # d = get_header_media_counts(client, ch)
+        # print(d)
+        # print(type(client))
+        get_commenters(client, ch, message_id)
 
 
-    # print(get_channel_id(client, ch))
-# 1232476793
+        # full = get_channel_full(client, ch)
+        # print(full)
+
+        # print(client.get_input_entity(ch))
+
+        # client.get_entity(1117628569).to_json() # альтернатива получению всей инфы
+
+
+        # print(get_channel_id(client, ch))
+    # 1232476793
 

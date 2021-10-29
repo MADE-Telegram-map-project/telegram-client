@@ -14,15 +14,24 @@ import pandas as pd
 from pyhocon import ConfigFactory
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
-from telethon.errors.rpc_error_list import (ChannelPrivateError,
-                                            FloodWaitError, RpcCallFailError,
-                                            RpcMcgetFailError,
-                                            UsernameInvalidError,
-                                            UsernameNotOccupiedError)
+from telethon.errors import (
+    ChannelPrivateError,
+    FloodWaitError,
+    RpcCallFailError,
+    RpcMcgetFailError,
+    UsernameInvalidError,
+    UsernameNotOccupiedError,
+)
+# from telethon.errors.rpc_error_list import (ChannelPrivateError,
+#                                             FloodWaitError,
+#                                             RpcCallFailError,
+#                                             RpcMcgetFailError,
+#                                             UsernameInvalidError,
+#                                             UsernameNotOccupiedError)
 from telethon.tl.types import PeerChannel
 from tqdm import tqdm
 
-from rutan_core.utils import get_channel_records_from_folder
+# from rutan_core.utils import get_channel_records_from_folder
 from core.utils import (
     FullChannelData, MediaChannelData, UserData, MessageData
 )
@@ -32,7 +41,7 @@ from telethon.sync import TelegramClient
 from telethon import functions, types
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.messages import (
-    GetSearchCountersRequest, 
+    GetSearchCountersRequest,
     GetRepliesRequest
 )
 
@@ -43,9 +52,9 @@ from telethon.tl.functions.messages import (
 
 class Crawler():
     ''' this is the main class responsible for obtaining data from telegram 
-    
+
     each method get_* do "one" query to api
-    
+
     '''
     offset_date = date.fromisoformat('2020-01-01')
     messages_limit = 1000
@@ -56,7 +65,7 @@ class Crawler():
     min_delay = 60
     max_delay = 180
     media_filters = [
-        types.InputMessagesFilterPhotos(), 
+        types.InputMessagesFilterPhotos(),
         types.InputMessagesFilterVideo(),
         types.InputMessagesFilterDocument(),
         types.InputMessagesFilterMusic(),
@@ -64,15 +73,6 @@ class Crawler():
         types.InputMessagesFilterVoice(),
         types.InputMessagesFilterGif(),
     ]
-    # media_names = [
-    #     "Photos",
-    #     "Video",
-    #     "Document",
-    #     "Music",
-    #     "Url",
-    #     "Voice",
-    #     "Gif",
-    # ]
 
     def __init__(self, user_profile, log_filename, config_path="application.conf",
                  log_folder="logs/", already_parsed_path="already_parsed/", invalid_id_folder="invalid_ids/"):
@@ -93,7 +93,7 @@ class Crawler():
         self.log_folder = log_folder
         self.already_parsed = self.get_already_parsed()
         self.non_existing = self.get_non_existing()
-        self.invalid_ids = get_channel_records_from_folder(invalid_id_folder)
+        # self.invalid_ids = get_channel_records_from_folder(invalid_id_folder)
 
     def crawl(self, records, id_mode=False):
         ''' that is the main method responsible for the parse of the messages
@@ -233,7 +233,7 @@ class Crawler():
     def get_header_media_counts(self, channel: Union[str, int]) -> MediaChannelData:
         """https://tl.telethon.dev/methods/messages/get_search_counters.html"""
         search_res = self.client(GetSearchCountersRequest(
-                peer=channel, filters=self.media_filters,
+            peer=channel, filters=self.media_filters,
         ))
         counts = [x.count for x in search_res]
         data = MediaChannelData(*counts)
@@ -242,9 +242,9 @@ class Crawler():
     def get_messages(self, channel: Union[str, int]) -> List[MessageData]:
         """ return collected messages from oldest to newest"""
         messages = self.client.get_messages(
-            channel, 
+            channel,
             limit=self.messages_limit,
-            offset_date=self.offset_date, 
+            offset_date=self.offset_date,
             reverse=True
         )
         data = []
@@ -258,10 +258,10 @@ class Crawler():
                 fwd_message_id = m.fwd_from.channel_post  # TODO check
 
             cur_mes_data = MessageData(
-                m.id, 
-                m.text, 
-                m.date, 
-                m.views, 
+                m.id,
+                m.text,
+                m.date,
+                m.views,
                 m.forwards,
                 replies_cnt,
                 fwd_channel_id,
@@ -271,22 +271,20 @@ class Crawler():
             data.append(cur_mes_data)
         return data
 
-
-    def get_commenters(self, channel: Union[str, int], message_id: int):
+    def get_commenters(self, channel: Union[str, int], message_id: int) -> List[UserData]:
         comments = self.client(GetRepliesRequest(
-            peer=channel, 
-            msg_id=message_id, 
-            offset_id=0, 
-            offset_date=None, 
+            peer=channel,
+            msg_id=message_id,
+            offset_id=0,
+            offset_date=None,
             add_offset=0,
             limit=0,
             max_id=0,
             min_id=0,
             hash=0,
         ))
-        commenters = [UserData(x.id, x.bot, x.username) for x in comments.users]
-        
-        # TODO add comment text
+        commenters = [UserData(x.id, x.bot, x.username)
+                      for x in comments.users]
 
         return commenters
 
