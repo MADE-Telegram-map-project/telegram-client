@@ -1,10 +1,17 @@
-from .config.configs import ClientSchema
-from .data.datas import FullChannelData, MediaChannelData, MessageData, UserData
+from .config.configs import ClientConfigSchema
+from .data.datas import (
+    FullChannelData, 
+    MediaChannelData, 
+    MessageData, 
+    UserData,
+    ReplyData
+)
 
 __all__ = [
-    "ClientSchema",
+    "ClientConfigSchema",
     "FullChannelData",
     "MediaChannelData",
     "MessageData",
     "UserData",
+    "ReplyData",
 ]

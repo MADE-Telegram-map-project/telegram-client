@@ -24,6 +24,7 @@ from telethon.errors import (
     RpcMcgetFailError,
     UsernameInvalidError,
     UsernameNotOccupiedError,
+    MsgIdInvalidError,
 )
 # from telethon.errors.rpc_error_list import (ChannelPrivateError,
 #                                             FloodWaitError,
@@ -36,8 +37,9 @@ from tqdm import tqdm
 
 # from rutan_core.utils import get_channel_records_from_folder
 from core.entities import (
-    FullChannelData, MediaChannelData, UserData, MessageData,
-    ClientSchema
+    FullChannelData, MediaChannelData,
+    UserData, MessageData, ReplyData,
+    ClientConfigSchema
 )
 
 from telethon import functions, types
@@ -77,8 +79,11 @@ class Crawler():
         types.InputMessagesFilterGif(),
     ]
 
-    def __init__(self, user_profile, log_filename, config_path="application.conf",
-                 log_folder="logs/", already_parsed_path="already_parsed/", invalid_id_folder="invalid_ids/"):
+    def __init__(
+            self, user_profile, log_filename,
+            config_path="configs/client_config.yml",
+            log_folder="logs/", already_parsed_path="already_parsed/",
+            invalid_id_folder="invalid_ids/"):
         ''' reads config values, creates logger and authorizes the client if necessary '''
         self.already_parsed_path = already_parsed_path
         self.already_parsed_channels = None
@@ -90,14 +95,14 @@ class Crawler():
         self.logger = logging.getLogger("rutan")
         self.log_filename = log_filename
         self.new_ids_usernames = "tmp/new_ids_usernames_mapping_" + log_filename
-        if user_profile == "interactive":
-            self.user_profile = "base"
-        else:
-            self.user_profile = user_profile
+        # if user_profile == "interactive":
+        ##     self.user_profile = "base"
+        # else:
+        ##     self.user_profile = user_profile
         self.client = self.__authorize()
         self.log_folder = log_folder
-        self.already_parsed = self.get_already_parsed()
-        self.non_existing = self.get_non_existing()
+        # self.already_parsed = self.get_already_parsed()
+        # self.non_existing = self.get_non_existing()
         # self.invalid_ids = get_channel_records_from_folder(invalid_id_folder)
 
     def crawl(self, records, id_mode=False):
@@ -189,53 +194,52 @@ class Crawler():
                 bp()
                 print('starting debuggin')
 
+    def __load_config(self) -> ClientConfigSchema:
+        base_config = OmegaConf.load(self.config_path)
+        schema = OmegaConf.structured(ClientConfigSchema)
+        config = OmegaConf.merge(schema, base_config)
+        config: ClientConfigSchema = OmegaConf.to_object(config)
+        return config
+
     def __authorize(self):
         client = TelegramClient(
-            self.config.get(self.find_config_name("app_name")), 
-            self.config.get(self.find_config_name("api_id")), 
-            self.config.get(self.find_config_name("api_hash"))
+            self.config.session,
+            self.config.api_id,
+            self.config.api_hash,
         )
         client.connect()
-        authorized = client.is_user_authorized()
-        if authorized:
+        if client.is_user_authorized():
             return client
         else:
             raise Exception("Not authorized")
 
-    def __load_config(self) -> ClientSchema:
-        base_config = OmegaConf.load(self.config_path)
-        schema = OmegaConf.structured(ClientSchema)
-        config = OmegaConf.merge(schema, base_config)
-        config: ClientSchema = OmegaConf.to_object(base_config)
-        return config
+    # def __authorize_old(self):
+    #     ''' if not authorized, needs to go through 2 factor authorization, otherwise connects '''
+    #     client = TelegramClient(
+    #         self.config.get(self.find_config_name("app_name")),
+    #         self.config.get(self.find_config_name("api_id")),
+    #         self.config.get(self.find_config_name("api_hash"))
+    #     )
+    #     connect = client.connect()
+    #     authorized = client.is_user_authorized()
+    #     if authorized:
+    #         return client
+    #     client.sign_in(self.config.get(self.find_config_name('phone_number')))
+    #     try:
+    #         client.sign_in(code=input('Enter code: '))
+    #     except SessionPasswordNeededError:
+    #         client.sign_in(password=getpass.getpass())
+    #     return client
 
-    def __authorize_old(self):
-        ''' if not authorized, needs to go through 2 factor authorization, otherwise connects '''
-        client = TelegramClient(
-            self.config.get(self.find_config_name("app_name")), 
-            self.config.get(self.find_config_name("api_id")), 
-            self.config.get(self.find_config_name("api_hash"))
-        )
-        connect = client.connect()
-        authorized = client.is_user_authorized()
-        if authorized:
-            return client
-        client.sign_in(self.config.get(self.find_config_name('phone_number')))
-        try:
-            client.sign_in(code=input('Enter code: '))
-        except SessionPasswordNeededError:
-            client.sign_in(password=getpass.getpass())
-        return client
-
-    def find_config_name(self, config_param):
-        return self.user_profile + "." + config_param
+    # def find_config_name(self, config_param):
+    #     return self.user_profile + "." + config_param
 
 ################
 # my functions #
 ################
 
     def get_channel_full(
-            self, channel: Union[str, int]) -> Tuple[FullChannelData, int]:
+            self, channel: Union[str, int]) -> Tuple[FullChannelData, Union[None, int]]:
         """ channel is link or id"""
         full = self.client(GetFullChannelRequest(channel=channel))
         header = full.chats[0]
@@ -266,55 +270,87 @@ class Crawler():
         data = MediaChannelData(*counts)
         return data
 
-    def get_messages(self, channel: Union[str, int]) -> List[MessageData]:
-        """ return collected messages from oldest to newest"""
+    def get_messages(
+            self, channel: Union[str, int], limit: int = None) -> List[MessageData]:
+        """ return collected messages from oldest to newest
+
+        we can collect MessageReplies and release from them short info
+        about commenters : List[PeerUser(user_id: int)]
+        """
+        limit = limit or self.messages_limit
         messages = self.client.get_messages(
-            channel,
-            limit=self.messages_limit,
+            entity=channel,
+            limit=limit,
             offset_date=self.offset_date,
-            reverse=True
+            reverse=True,
         )
         data = []
-        for m in messages:
-            replies_cnt = m.replies.replies
-            if m.fwd_from is None:
+        for msg in messages:
+            replies = msg.replies
+            replies_cnt = 0
+            if replies is not None:
+                # old messages has no replies object (only None)
+                replies_cnt = replies.replies
+            if msg.fwd_from is None:
                 fwd_channel_id = None
                 fwd_message_id = None
             else:
-                fwd_channel_id = m.fwd_from.from_id.channel_id
-                fwd_message_id = m.fwd_from.channel_post  # TODO check
+                if isinstance(msg.fwd_from.from_id, types.PeerChannel):
+                    fwd_channel_id = msg.fwd_from.from_id.channel_id
+                else:
+                    fwd_channel_id = None
 
-            cur_mes_data = MessageData(
-                m.id,
-                m.text,
-                m.date,
-                m.views,
-                m.forwards,
+                fwd_message_id = msg.fwd_from.channel_post  # TODO check
+
+            cur_message_data = MessageData(
+                msg.id,
+                msg.text,
+                msg.date,
+                msg.views,
+                msg.forwards,
                 replies_cnt,
                 fwd_channel_id,
                 fwd_message_id,
-                m.replies,
+                replies,
             )
-            data.append(cur_mes_data)
+            data.append(cur_message_data)
         return data
 
-    def get_commenters(
-            self, channel: Union[str, int], message_id: int) -> List[UserData]:
-        comments = self.client(GetRepliesRequest(
-            peer=channel,
-            msg_id=message_id,
-            offset_id=0,
-            offset_date=None,
-            add_offset=0,
-            limit=0,
-            max_id=0,
-            min_id=0,
-            hash=0,
-        ))
+    def get_replies(
+        self,
+        channel: Union[str, int],
+        message_id: int,
+    ) -> Tuple[List[ReplyData], List[UserData]]:
+        """ run only if message has replies obj OR if replies_cnt > 0 """
+        try:
+            comments = self.client(GetRepliesRequest(
+                peer=channel,
+                msg_id=message_id,
+                offset_id=0,
+                offset_date=None,
+                add_offset=0,
+                limit=0,
+                max_id=0,
+                min_id=0,
+                hash=0,
+            ))
+        except MsgIdInvalidError as e:
+            return [], []
+        except Exception as e:
+            raise e
+
         commenters = [UserData(x.id, x.bot, x.username)
                       for x in comments.users]
+        replies = [
+            ReplyData(
+                msg.id,
+                msg.peer_id.channel_id,
+                msg.message,
+                msg.date,
+                msg.from_id.user_id)
+            for msg in comments.messages]
 
-        return commenters
+        return replies, commenters
 
     def save_messages_from_channel(self, channel):
         '''

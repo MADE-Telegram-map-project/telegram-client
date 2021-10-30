@@ -1,4 +1,4 @@
-session: client1
+session: ${oc.env:SESSION}
 api_id: ${oc.env:API_ID}
 api_hash: ${oc.env:API_HASH}
 phone: ${oc.env:PHONE}

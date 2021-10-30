@@ -1,3 +1,3 @@
-from .configs import ClientSchema
+from .configs import ClientConfigSchema
 
-__all__ = ["ClientSchema"]
+__all__ = ["ClientConfigSchema"]

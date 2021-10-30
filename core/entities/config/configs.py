@@ -5,7 +5,7 @@ from omegaconf import MISSING
 
 
 @ dataclass
-class ClientSchema:
+class ClientConfigSchema:
     session: str
     api_id: int
     api_hash: str

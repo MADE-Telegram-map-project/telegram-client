@@ -1,4 +1,6 @@
+from time import sleep
 
+from core.crawler import Crawler
 
 
 
@@ -35,6 +37,23 @@ def run_crawler():
 #       crawler.create_temporal_dataset(inputpath="data/groups_channels_Oct_2017.csv", outpath="data/tmp_dataset.csv")
 #       data    = Preprocessor().get_clean_downloaded_dataset_with_7k_records("data/tmp_dataset.csv")
     return locals()
+
+
+def main():
+    ch = 1149710531
+    mid = 2581
+
+    crawler = Crawler("user_profile", "log_filename")
+    # crawler.get_commenters(ch, mid)
+    n_messages = 5
+    messages = crawler.get_messages(ch, n_messages)
+    sleep(2)
+
+    for msg in messages:
+        replies, commenters = crawler.get_replies(ch, msg.message_id)
+        sleep(1)
+
+
 
 if __name__ == "__main__":
     main()
