@@ -12,6 +12,7 @@ setup(
         "numpy~=1.21.3",
         "pandas~=1.3.4",
         "tqdm~=4.62.3",
+        "omegaconf~=2.1",
     ],
     license="MIT",
 )

@@ -18,7 +18,7 @@ utils.parsing.get_channel_id
 """
 import os
 from datetime import date
-from collections import namedtuple
+# from collections import namedtuple
 
 import telethon
 from telethon.sync import TelegramClient
@@ -30,49 +30,49 @@ from telethon.tl.functions.messages import (
 )
 
 
-FullChannelData = namedtuple(
-    "FullChannelData", 
-    ("channel_id", "title", "link", "about", "date", "participants_count")
-)
-MediaChannelData = namedtuple(
-    "MediaChannelData", 
-    ("photo", "video", "document", "music", "url", "voice", "gif")
-)
-UserData = namedtuple("UserData", ("user_id", "bot", "username"))
-MessageData = namedtuple(
-    "MessageData", (
-        "message_id", 
-        "id", 
-        "text", 
-        "date", 
-        "views",
-        "forwards",
-        "replies_cnt", 
-        "fwd_channel_id", 
-        "fwd_message_id",
-        "replies",
-    )
-)
+# FullChannelData = namedtuple(
+#     "FullChannelData", 
+#     ("channel_id", "title", "link", "about", "date", "participants_count")
+# )
+# MediaChannelData = namedtuple(
+#     "MediaChannelData", 
+#     ("photo", "video", "document", "music", "url", "voice", "gif")
+# )
+# UserData = namedtuple("UserData", ("user_id", "bot", "username"))
+# MessageData = namedtuple(
+#     "MessageData", (
+#         "message_id", 
+#         "id", 
+#         "text", 
+#         "date", 
+#         "views",
+#         "forwards",
+#         "replies_cnt", 
+#         "fwd_channel_id", 
+#         "fwd_message_id",
+#         "replies",
+#     )
+# )
 
 
-MEDIA_FILTERS = [
-    types.InputMessagesFilterPhotos(), 
-    types.InputMessagesFilterVideo(),
-    types.InputMessagesFilterDocument(),
-    types.InputMessagesFilterMusic(),
-    types.InputMessagesFilterUrl(),
-    types.InputMessagesFilterVoice(),
-    types.InputMessagesFilterGif(),
-]
-MEDIA_NAMES = [
-    "Photos",
-    "Video",
-    "Document",
-    "Music",
-    "Url",
-    "Voice",
-    "Gif",
-]
+# MEDIA_FILTERS = [
+#     types.InputMessagesFilterPhotos(), 
+#     types.InputMessagesFilterVideo(),
+#     types.InputMessagesFilterDocument(),
+#     types.InputMessagesFilterMusic(),
+#     types.InputMessagesFilterUrl(),
+#     types.InputMessagesFilterVoice(),
+#     types.InputMessagesFilterGif(),
+# ]
+# MEDIA_NAMES = [
+#     "Photos",
+#     "Video",
+#     "Document",
+#     "Music",
+#     "Url",
+#     "Voice",
+#     "Gif",
+# ]
 
 
 def get_header_media_counts(client, peer):

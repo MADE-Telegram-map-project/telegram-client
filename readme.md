@@ -5,6 +5,10 @@ Code to crawl on telegram and collect channels information including:
 - messages
 - participants (commenters and chat users)
 
+## Data flows
+
+![flows](doc/images/Client_data_flows.drawio.png)
+
 
 ## Database structure:
 

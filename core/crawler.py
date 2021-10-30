@@ -4,15 +4,18 @@ import json
 import logging
 import os
 import re
-from collections import namedtuple
+# from collections import namedtuple
 from datetime import date, datetime
 from time import sleep, time
 from typing import Tuple, List, Union
 
 import numpy as np
 import pandas as pd
-from pyhocon import ConfigFactory
-from telethon import TelegramClient
+# from pyhocon import ConfigFactory
+from omegaconf import OmegaConf
+import telethon
+from telethon.sync import TelegramClient
+# from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
 from telethon.errors import (
     ChannelPrivateError,
@@ -32,12 +35,11 @@ from telethon.tl.types import PeerChannel
 from tqdm import tqdm
 
 # from rutan_core.utils import get_channel_records_from_folder
-from core.utils import (
-    FullChannelData, MediaChannelData, UserData, MessageData
+from core.entities import (
+    FullChannelData, MediaChannelData, UserData, MessageData,
+    ClientSchema
 )
 
-import telethon
-from telethon.sync import TelegramClient
 from telethon import functions, types
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.messages import (
@@ -51,12 +53,13 @@ from telethon.tl.functions.messages import (
 
 
 class Crawler():
-    ''' this is the main class responsible for obtaining data from telegram 
+    '''
+    this is the main class responsible for obtaining data from telegram
 
     each method get_* do "one" query to api
 
     '''
-    offset_date = date.fromisoformat('2020-01-01')
+    offset_date = date.fromisoformat("2020-01-01")
     messages_limit = 1000
 
     messages_folder = "data/messages/"
@@ -185,12 +188,26 @@ class Crawler():
                 print('starting debuggin')
 
     def __authorize(self):
+        client = TelegramClient(
+            self.config.get(self.find_config_name("app_name")), 
+            self.config.get(self.find_config_name("api_id")), 
+            self.config.get(self.find_config_name("api_hash"))
+        )
+        client.connect()
+        authorized = client.is_user_authorized()
+        if authorized:
+            return client
+        else:
+            raise Exception("Not authorized")
+
+
+    def __authorize_old(self):
         ''' if not authorized, needs to go through 2 factor authorization, otherwise connects '''
         client = TelegramClient(
-            self.config.get(
-                self.find_config_name("app_name")), self.config.get(
-                self.find_config_name("api_id")), self.config.get(
-                self.find_config_name("api_hash")))
+            self.config.get(self.find_config_name("app_name")), 
+            self.config.get(self.find_config_name("api_id")), 
+            self.config.get(self.find_config_name("api_hash"))
+        )
         connect = client.connect()
         authorized = client.is_user_authorized()
         if authorized:
@@ -209,7 +226,8 @@ class Crawler():
 # my functions #
 ################
 
-    def get_channel_full(self, channel: Union[str, int]) -> Tuple[FullChannelData, int]:
+    def get_channel_full(
+            self, channel: Union[str, int]) -> Tuple[FullChannelData, int]:
         """ channel is link or id"""
         full = self.client(GetFullChannelRequest(channel=channel))
         header = full.chats[0]
@@ -230,7 +248,8 @@ class Crawler():
         data = [UserData(x.id, x.bot, x.username) for x in chat_members]
         return data
 
-    def get_header_media_counts(self, channel: Union[str, int]) -> MediaChannelData:
+    def get_header_media_counts(
+            self, channel: Union[str, int]) -> MediaChannelData:
         """https://tl.telethon.dev/methods/messages/get_search_counters.html"""
         search_res = self.client(GetSearchCountersRequest(
             peer=channel, filters=self.media_filters,
@@ -271,7 +290,8 @@ class Crawler():
             data.append(cur_mes_data)
         return data
 
-    def get_commenters(self, channel: Union[str, int], message_id: int) -> List[UserData]:
+    def get_commenters(
+            self, channel: Union[str, int], message_id: int) -> List[UserData]:
         comments = self.client(GetRepliesRequest(
             peer=channel,
             msg_id=message_id,
