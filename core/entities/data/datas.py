@@ -1,6 +1,7 @@
 import datetime
 # from collections import namedtuple
 from dataclasses import dataclass
+from typing import Union
 
 from telethon.tl.types import MessageReplies
 
@@ -13,6 +14,7 @@ class FullChannelData:
     about: str
     date: datetime.datetime
     participants_count: int
+    linked_chat_id: Union[int, None]
 
 
 @dataclass

@@ -41,6 +41,7 @@ from core.entities import (
     UserData, MessageData, ReplyData,
     ClientConfigSchema
 )
+from core.utils import is_processed, load_channel, mark_as_processing
 
 from telethon import functions, types
 from telethon.tl.functions.channels import GetFullChannelRequest
@@ -48,10 +49,6 @@ from telethon.tl.functions.messages import (
     GetSearchCountersRequest,
     GetRepliesRequest
 )
-
-
-# Debugging
-# from pdb import set_trace as bp
 
 
 class Crawler():
@@ -90,20 +87,34 @@ class Crawler():
         self.non_existing_accounts_path = self.non_existing_accounts_folder + "/" + log_filename
         self.config_path = config_path
         self.config = self.__load_config()
-        # self.config = ConfigFactory.parse_file(config_path)
         self.invalid_id_path = invalid_id_folder + log_filename
         self.logger = logging.getLogger("rutan")
         self.log_filename = log_filename
         self.new_ids_usernames = "tmp/new_ids_usernames_mapping_" + log_filename
-        # if user_profile == "interactive":
-        ##     self.user_profile = "base"
-        # else:
-        ##     self.user_profile = user_profile
         self.client = self.__authorize()
         self.log_folder = log_folder
         # self.already_parsed = self.get_already_parsed()
         # self.non_existing = self.get_non_existing()
         # self.invalid_ids = get_channel_records_from_folder(invalid_id_folder)
+
+    def __load_config(self) -> ClientConfigSchema:
+        base_config = OmegaConf.load(self.config_path)
+        schema = OmegaConf.structured(ClientConfigSchema)
+        config = OmegaConf.merge(schema, base_config)
+        config: ClientConfigSchema = OmegaConf.to_object(config)
+        return config
+
+    def __authorize(self):
+        client = TelegramClient(
+            self.config.session,
+            self.config.api_id,
+            self.config.api_hash,
+        )
+        client.connect()
+        if client.is_user_authorized():
+            return client
+        else:
+            raise Exception("Not authorized")
 
     def crawl(self, records, id_mode=False):
         ''' that is the main method responsible for the parse of the messages
@@ -113,29 +124,50 @@ class Crawler():
         self.__init_logging()
         start_time = time()
         successful = 0
-        for channel_record in tqdm(records):
-            if id_mode:
-                username = channel_record  # it's in fact id and not url or name, in this case
-            else:
-                username = channel_record.replace("@", "").lower()
+        while True:
+            username = load_channel()
+        # for channel_record in tqdm(records):
+        #     # if id_mode:
+        #     #     username = channel_record  # it's in fact id and not url or name, in this case
+        #     # else:
+        #     #     username = channel_record.replace("@", "").lower()
 
-            if username in self.already_parsed or username in self.non_existing or username in self.invalid_ids:
+            # if username in self.already_parsed or username in self.non_existing or username in self.invalid_ids:
+            if is_processed(username):
                 continue
+            mark_as_processing(username)
             self.logger.info('started iteration for {}'.format(username))
             try:
-                if id_mode:
-                    channel = self.client.get_entity(PeerChannel(username))
-                    with open(self.new_ids_usernames, "a") as new_id_usename_file:
-                        print(
-                            "{channel_id},{channel_username}".format(
-                                channel_id=username,
-                                channel_username=channel.username),
-                            file=new_id_usename_file)
-                else:
-                    channel = self.client.get_entity(username)
+                full_data = self.get_channel_full(username)
+                media_data = self.get_header_media_counts(username)
+                linked_chat_id = full_data.linked_chat_id
+                chat_users = []
+                if linked_chat_id is not None:
+                    chat_users = self.get_linked_chat_members(linked_chat_id)
+
+                messages = self.get_messages(username)
+                replies = []
+                reply_users = []
+                for msg in messages:
+                    if msg.replies_cnt > 0 and msg.replies is not None:
+                        cur_replies, cur_commenters = self.get_replies(
+                            username, msg.message_id)
+                        for reply in cur_replies:
+                            replies.append(reply)
+                        for user in cur_commenters:
+                            reply_users.append(user)
+                
+
+                
+
+
                 delay_time = self.get_request_delay()
+                self.logger.info(
+                    'Going to sleep for {} seconds'.format(
+                        str(delay_time)))
                 sleep(delay_time)
-                self.save_messages_from_channel(channel)
+
+                # self.save_messages_from_channel(channel)
                 successful += 1
                 delay_time = self.get_request_delay()
                 self.logger.info(
@@ -194,50 +226,6 @@ class Crawler():
                 bp()
                 print('starting debuggin')
 
-    def __load_config(self) -> ClientConfigSchema:
-        base_config = OmegaConf.load(self.config_path)
-        schema = OmegaConf.structured(ClientConfigSchema)
-        config = OmegaConf.merge(schema, base_config)
-        config: ClientConfigSchema = OmegaConf.to_object(config)
-        return config
-
-    def __authorize(self):
-        client = TelegramClient(
-            self.config.session,
-            self.config.api_id,
-            self.config.api_hash,
-        )
-        client.connect()
-        if client.is_user_authorized():
-            return client
-        else:
-            raise Exception("Not authorized")
-
-    # def __authorize_old(self):
-    #     ''' if not authorized, needs to go through 2 factor authorization, otherwise connects '''
-    #     client = TelegramClient(
-    #         self.config.get(self.find_config_name("app_name")),
-    #         self.config.get(self.find_config_name("api_id")),
-    #         self.config.get(self.find_config_name("api_hash"))
-    #     )
-    #     connect = client.connect()
-    #     authorized = client.is_user_authorized()
-    #     if authorized:
-    #         return client
-    #     client.sign_in(self.config.get(self.find_config_name('phone_number')))
-    #     try:
-    #         client.sign_in(code=input('Enter code: '))
-    #     except SessionPasswordNeededError:
-    #         client.sign_in(password=getpass.getpass())
-    #     return client
-
-    # def find_config_name(self, config_param):
-    #     return self.user_profile + "." + config_param
-
-################
-# my functions #
-################
-
     def get_channel_full(
             self, channel: Union[str, int]) -> Tuple[FullChannelData, Union[None, int]]:
         """ channel is link or id"""
@@ -252,8 +240,9 @@ class Crawler():
             full.full_chat.about,
             header.date,
             full.full_chat.participants_count,
+            linked_chat_id,
         )
-        return data, linked_chat_id
+        return data
 
     def get_linked_chat_members(self, chat_id: int) -> List[UserData]:
         chat_members = self.client.get_participants(chat_id)
@@ -410,6 +399,10 @@ class Crawler():
         ''' we need to set up a delay between requests, it must be a random number '''
         delay_time = np.random.randint(low=self.min_delay, high=self.max_delay)
         return delay_time
+    
+    def wait(self, delay: int = None):
+        delay = delay or self.get_request_delay()
+        sleep(delay)
 
     def get_already_parsed(self):
         ''' reads the list of files in self.messages_folder, caches it and returns saved list '''
