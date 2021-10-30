@@ -26,6 +26,7 @@ from telethon.errors import (
     UsernameNotOccupiedError,
     MsgIdInvalidError,
 )
+from telethon.tl.types import MessageEntityMention
 # from telethon.errors.rpc_error_list import (ChannelPrivateError,
 #                                             FloodWaitError,
 #                                             RpcCallFailError,

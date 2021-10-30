@@ -45,7 +45,7 @@ def main():
 
     crawler = Crawler("user_profile", "log_filename")
     # crawler.get_commenters(ch, mid)
-    n_messages = 5
+    n_messages = 50
     messages = crawler.get_messages(ch, n_messages)
     sleep(2)
 
