@@ -83,7 +83,9 @@ class Crawler():
         self.already_parsed_path = already_parsed_path
         self.already_parsed_channels = None
         self.non_existing_accounts_path = self.non_existing_accounts_folder + "/" + log_filename
-        self.config = ConfigFactory.parse_file(config_path)
+        self.config_path = config_path
+        self.config = self.__load_config()
+        # self.config = ConfigFactory.parse_file(config_path)
         self.invalid_id_path = invalid_id_folder + log_filename
         self.logger = logging.getLogger("rutan")
         self.log_filename = log_filename
@@ -200,6 +202,12 @@ class Crawler():
         else:
             raise Exception("Not authorized")
 
+    def __load_config(self) -> ClientSchema:
+        base_config = OmegaConf.load(self.config_path)
+        schema = OmegaConf.structured(ClientSchema)
+        config = OmegaConf.merge(schema, base_config)
+        config: ClientSchema = OmegaConf.to_object(base_config)
+        return config
 
     def __authorize_old(self):
         ''' if not authorized, needs to go through 2 factor authorization, otherwise connects '''

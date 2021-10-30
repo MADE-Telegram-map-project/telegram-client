@@ -1,6 +1,6 @@
 from omegaconf import OmegaConf
 
-from core.entities.config import ClientSchema
+from core.entities import ClientSchema
 
 
 if __name__ == "__main__":
