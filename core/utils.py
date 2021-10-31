@@ -39,7 +39,7 @@ def is_channel(client, link: str) -> tuple:
 
 def load_channel() -> int:
     """ load channel from queue """
-    pass
+    return 0
 
 
 def is_processed(channel) -> bool:

@@ -140,6 +140,7 @@ class Crawler():
             self.logger.info('started iteration for {}'.format(username))
             try:
                 full_data = self.get_channel_full(username)
+                self.wait()
                 media_data = self.get_header_media_counts(username)
                 linked_chat_id = full_data.linked_chat_id
                 chat_users = []

@@ -40,8 +40,9 @@ def run_crawler():
 
 
 def main():
-    ch = 1149710531
-    mid = 2581
+    # ch = 1149710531
+    # mid = 2581
+    ch = "gagaga_momomo"
 
     crawler = Crawler("user_profile", "log_filename")
     # crawler.get_commenters(ch, mid)
