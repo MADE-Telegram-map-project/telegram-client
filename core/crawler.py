@@ -1,18 +1,17 @@
 from datetime import date
-import getpass  # so the password is hidden when typed
+# import getpass  # so the password is hidden when typed
 import json
 import logging
 import os
 import re
-# from collections import namedtuple
 from datetime import date, datetime
 from time import sleep, time
 from typing import Tuple, List, Union
 
 import numpy as np
 import pandas as pd
-# from pyhocon import ConfigFactory
 from omegaconf import OmegaConf
+from statemachine import StateMachine, State
 import telethon
 from telethon.sync import TelegramClient
 # from telethon import TelegramClient
@@ -34,7 +33,13 @@ from telethon.tl.types import MessageEntityMention
 #                                             UsernameInvalidError,
 #                                             UsernameNotOccupiedError)
 from telethon.tl.types import PeerChannel
-from tqdm import tqdm
+from telethon import functions, types
+from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon.tl.functions.messages import (
+    GetSearchCountersRequest,
+    GetRepliesRequest
+)
+# from tqdm import tqdm
 
 # from rutan_core.utils import get_channel_records_from_folder
 from core.entities import (
@@ -44,15 +49,9 @@ from core.entities import (
 )
 from core.utils import is_processed, load_channel, mark_as_processing
 
-from telethon import functions, types
-from telethon.tl.functions.channels import GetFullChannelRequest
-from telethon.tl.functions.messages import (
-    GetSearchCountersRequest,
-    GetRepliesRequest
-)
 
 
-class Crawler():
+class Crawler(StateMachine):
     '''
     this is the main class responsible for obtaining data from telegram
 
@@ -62,9 +61,9 @@ class Crawler():
     offset_date = date.fromisoformat("2020-01-01")
     messages_limit = 1000
 
-    messages_folder = "data/messages/"
-    already_parsed = "already_parsed/"
-    non_existing_accounts_folder = "non_existing/"
+    # messages_folder = "data/messages/"
+    # already_parsed = "already_parsed/"
+    # non_existing_accounts_folder = "non_existing/"
     min_delay = 60
     max_delay = 180
     media_filters = [
@@ -77,23 +76,37 @@ class Crawler():
         types.InputMessagesFilterGif(),
     ]
 
+    # # states
+    # state_channel = State('Channel', initial=True)
+    # state_header = State('Header')
+    # state_chaters = State('Chaters')
+    # state_messages = State('Messages')
+    # state_messages_digger = State('MessagesDig')
+    # state_commenters = State('Commenters')  # optional state
+
+    # # transitions
+    # cycle = state_channel.to(state_header) | state_header.to(state_chaters) | \
+    #     state_chaters.to(state_messages) | state_messages.to(state_messages_digger) | \
+    #         state_messages_digger.to(state_commenters) | state_commenters.to(state_channel)
+    
+
     def __init__(
             self, user_profile, log_filename,
             config_path="configs/client_config.yml",
             log_folder="logs/", already_parsed_path="already_parsed/",
             invalid_id_folder="invalid_ids/"):
         ''' reads config values, creates logger and authorizes the client if necessary '''
-        self.already_parsed_path = already_parsed_path
-        self.already_parsed_channels = None
-        self.non_existing_accounts_path = self.non_existing_accounts_folder + "/" + log_filename
+        # self.already_parsed_path = already_parsed_path
+        # self.already_parsed_channels = None
+        # self.non_existing_accounts_path = self.non_existing_accounts_folder + "/" + log_filename
         self.config_path = config_path
         self.config = self.__load_config()
-        self.invalid_id_path = invalid_id_folder + log_filename
-        self.logger = logging.getLogger("rutan")
-        self.log_filename = log_filename
-        self.new_ids_usernames = "tmp/new_ids_usernames_mapping_" + log_filename
+        # self.invalid_id_path = invalid_id_folder + log_filename
+        # self.logger = logging.getLogger("rutan")
+        # self.log_filename = log_filename
+        # self.new_ids_usernames = "tmp/new_ids_usernames_mapping_" + log_filename
         self.client = self.__authorize()
-        self.log_folder = log_folder
+        # self.log_folder = log_folder
         # self.already_parsed = self.get_already_parsed()
         # self.non_existing = self.get_non_existing()
         # self.invalid_ids = get_channel_records_from_folder(invalid_id_folder)
@@ -224,7 +237,7 @@ class Crawler():
                 self.write_final_stats(successful, start_time)
                 bp()
                 print('starting debuggin')
-
+    
     def get_channel_full(
             self, channel: Union[str, int]) -> Tuple[FullChannelData, Union[None, int]]:
         """ channel is link or id"""
@@ -292,15 +305,16 @@ class Crawler():
                 fwd_message_id = msg.fwd_from.channel_post  # TODO check
 
             cur_message_data = MessageData(
-                msg.id,
-                msg.text,
-                msg.date,
-                msg.views,
-                msg.forwards,
-                replies_cnt,
-                fwd_channel_id,
-                fwd_message_id,
-                replies,
+                message_id=msg.id,
+                channel_id=msg.peer_id.channel_id,
+                message=msg.raw_text,  # text maybe?
+                date=msg.date,
+                views=msg.views,
+                forwards=msg.forwards,
+                replies_cnt=replies_cnt,
+                fwd_channel_id=fwd_channel_id,
+                fwd_message_id=fwd_message_id,
+                replies=replies,
             )
             data.append(cur_message_data)
         return data
@@ -332,11 +346,11 @@ class Crawler():
                       for x in comments.users]
         replies = [
             ReplyData(
-                msg.id,
-                msg.peer_id.channel_id,
-                msg.message,
-                msg.date,
-                msg.from_id.user_id)
+                message_id=msg.id,
+                channel_id=msg.peer_id.channel_id,
+                message=msg.message,
+                date=msg.date,
+                user_id=msg.from_id.user_id)
             for msg in comments.messages]
 
         return replies, commenters
