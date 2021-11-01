@@ -145,7 +145,8 @@ class Crawler():
                 linked_chat_id = full_data.linked_chat_id
                 chat_users = []
                 if linked_chat_id is not None:
-                    chat_users = self.get_linked_chat_members(linked_chat_id)
+                    chat_users = self.get_linked_chat_members(
+                        linked_chat_id, full_data)
 
                 messages = self.get_messages(username)
                 replies = []
@@ -158,10 +159,6 @@ class Crawler():
                             replies.append(reply)
                         for user in cur_commenters:
                             reply_users.append(user)
-                
-
-                
-
 
                 delay_time = self.get_request_delay()
                 self.logger.info(
@@ -246,9 +243,10 @@ class Crawler():
         )
         return data
 
-    def get_linked_chat_members(self, chat_id: int) -> List[UserData]:
+    def get_linked_chat_members(self, chat_id: int, full_data: FullChannelData) -> List[UserData]:
         chat_members = self.client.get_participants(chat_id)
-        data = [UserData(x.id, x.bot, x.username) for x in chat_members]
+        data = [UserData(full_data.channel_id, x.id, x.bot, x.username)
+                for x in chat_members]
         return data
 
     def get_header_media_counts(
@@ -401,7 +399,7 @@ class Crawler():
         ''' we need to set up a delay between requests, it must be a random number '''
         delay_time = np.random.randint(low=self.min_delay, high=self.max_delay)
         return delay_time
-    
+
     def wait(self, delay: int = None):
         delay = delay or self.get_request_delay()
         sleep(delay)

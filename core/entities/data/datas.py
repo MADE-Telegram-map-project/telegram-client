@@ -30,15 +30,17 @@ class MediaChannelData:
 
 @dataclass
 class UserData:
+    channel_id: int
     user_id: int
-    bot: str
+    bot: bool
     username: str
 
 
 @dataclass
 class MessageData:
     message_id: int
-    text: str
+    channel_id: int
+    message: str
     date: datetime.datetime
     views: int
     forwards: int
