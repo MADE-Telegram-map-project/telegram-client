@@ -43,14 +43,13 @@ from core.entities import (
     ClientConfigSchema
 )
 from core.utils import (
-    is_processed, 
-    load_channel, 
+    is_processed,
+    load_channel,
     cool_exceptor,
     mark_as_processing,
     mark_as_error,
-    mark_as_ok 
+    mark_as_ok
 )
-
 
 
 class Crawler():
@@ -111,18 +110,18 @@ class Crawler():
             return client
         else:
             raise Exception("Not authorized")
-    
-    def __init_logging(self):        
+
+    def __init_logging(self):
         with open(self.logging_config_path) as config_fin:
             config = yaml.safe_load(config_fin)
             logging.config.dictConfig(config)
-            
         # let's go
         self.logger.debug("*** New run ***")
 
     def crawl(self, records, id_mode=False):
         ''' that is the main method responsible for the parse of the messages
-            id_mode = True (default False) -- crawl method receives only ids and not full dataset to work on
+            id_mode = True (default False) -- crawl method receives only ids
+            and not full dataset to work on
             TODO: complete the description
         '''
         self.__init_logging()
@@ -138,75 +137,66 @@ class Crawler():
                 break
 
             if is_processed(username):
-                self.logger.info('already parsed {}'.format(username))
+                self.logger.info('Already parsed {}'.format(username))
                 continue
             mark_as_processing(username)
-            self.logger.info("started iteration for {}".format(username))
-            self.logger.info("run channel full extraction")
+            self.logger.info("Started iteration for {}".format(username))
+            self.logger.info("Run channel full extraction")
             full_data = self.get_channel_full(username)
             if full_data is None:
-                self.logger.info("cannot get channel full")
+                self.logger.error("Cannot get channel full")
                 mark_as_error(username)
                 self.wait()
                 continue
             else:
-                self.logger.info("got channel full - username: {}, id: {}"\
-                    .format(full_data.username, full_data.channel_id))
+                channel_id = full_data[0].channel_id
+                self.logger.info(
+                    "Got channel full - username: {}, id: {}".format(
+                        full_data.username, channel_id))
 
             self.wait()
-            self.logger.info('run channel media counts extraction for {}'\
-                .format(username))
+            self.logger.info('Run channel media counts extraction')
             media_data = self.get_header_media_counts(username)
             if media_data is None:
-                self.logger.info("cannot get channel media counts")
-                self.logger.info("continue crawling")
-                media_data = MediaChannelData()  # default zeros
+                self.logger.error("Cannot get channel media counts")
+                self.logger.info("Continue crawling")
+                media_data = (MediaChannelData(), None)  # default zeros
             else:
-                self.logger.info("media counts extracted")
+                self.logger.info("Media counts extracted")
 
             self.wait()
             linked_chat_id = full_data.linked_chat_id
             chat_users = []
             if linked_chat_id is not None:
-                self.logger.info("extract linked chat (id={}) users for {}"\
-                    .format(linked_chat_id, username))
+                self.logger.info("Extract linked chat (id={}) users")
                 chat_users = self.get_linked_chat_members(
                     linked_chat_id, full_data)
+                if chat_users is None:
+                    self.logger.error("Cannot get linked chat users")
+                else:
+                    self.logger.info("{} users extracted from linked chat"
+                                     .format(len(chat_users[0])))
             else:
-                self.logger.info("There are no linked chat fo")
+                self.logger.info("There are no linked chat")
 
             self.wait()
-            self.logger.info("extract messages from channel")
+            self.logger.info("Start retrieving of messages from channel")
             messages = self.get_messages(username)
+            if messages is None:
+                self.logger.error("Cannot retrieve channel messages")
+            else:
+                self.logger.info("Retrieved {} messages".format(
+                    len(messages[0])))
 
-            # replies = []
-            # reply_users = []
-            # for msg in messages:
-            #     if msg.replies_cnt > 0 and msg.replies is not None:
-            #         cur_replies, cur_commenters = self.get_replies(
-            #             username, msg.message_id)
-            #         for reply in cur_replies:
-            #             replies.append(reply)
-            #         for user in cur_commenters:
-            #             reply_users.append(user)
-
-            delay_time = self.get_request_delay()
-            self.logger.info(
-                'Going to sleep for {} seconds'.format(
-                    str(delay_time)))
-            sleep(delay_time)
-
-            # self.save_messages_from_channel(channel)
+            mark_as_ok(username)
             successful += 1
-            delay_time = self.get_request_delay()
-            self.logger.info(
-                'Going to sleep for {} seconds'.format(
-                    str(delay_time)))
-            sleep(delay_time)
-            
+            spent_time = time() - start_time
+            self.logger.info("Channel {} done in {} seconds".format(
+                username, spent_time))
+
     @cool_exceptor
     def get_channel_full(
-            self, channel: Union[str, int]) -> FullChannelData:
+            self, channel: Union[str, int]) -> Tuple[FullChannelData, None]:
         """ channel is link or id"""
         full = self.client(GetFullChannelRequest(channel=channel))
         header = full.chats[0]
@@ -221,14 +211,15 @@ class Crawler():
             participants_count=full.full_chat.participants_count,
             linked_chat_id=linked_chat_id,
         )
-        return data
+        return data, full
 
     @cool_exceptor
-    def get_linked_chat_members(self, chat_id: int, full_data: FullChannelData) -> List[UserData]:
+    def get_linked_chat_members(self, chat_id: int,
+                                full_data: FullChannelData) -> List[UserData]:
         chat_members = self.client.get_participants(chat_id)
         data = [UserData(full_data.channel_id, x.id, x.bot, x.username)
                 for x in chat_members]
-        return data
+        return data, chat_members
 
     @cool_exceptor
     def get_header_media_counts(
@@ -239,7 +230,7 @@ class Crawler():
         ))
         counts = [x.count for x in search_res]
         data = MediaChannelData(*counts)
-        return data
+        return data, search_res
 
     @cool_exceptor
     def get_messages(
@@ -257,7 +248,6 @@ class Crawler():
             offset_date=self.offset_date,
             reverse=True,
         )
-        self.logger.info("Extracted {} messages from".format(len(messages)))
         data = []
         for msg in messages:
             replies = msg.replies
@@ -289,7 +279,7 @@ class Crawler():
                 replies=replies,
             )
             data.append(cur_message_data)
-        return data
+        return data, messages
 
     @cool_exceptor
     def get_replies(
@@ -326,7 +316,7 @@ class Crawler():
                 user_id=msg.from_id.user_id)
             for msg in comments.messages]
 
-        return replies, commenters
+        return replies, commenters, comments
 
     def save_messages_from_channel(self, channel):
         '''
@@ -387,8 +377,11 @@ class Crawler():
         delay_time = np.random.randint(low=self.min_delay, high=self.max_delay)
         return delay_time
 
-    def wait(self, delay: int = None):
+    def wait(self, delay: int = None, to_log=True):
         delay = delay or self.get_request_delay()
+        if to_log:
+            self.logger.info('going to sleep for {} seconds'
+                             .format(str(delay_time)))
         sleep(delay)
 
     def get_already_parsed(self):
