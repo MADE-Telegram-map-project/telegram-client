@@ -2,6 +2,7 @@ from datetime import date
 # import getpass  # so the password is hidden when typed
 import json
 import logging
+import logging.config
 import os
 import re
 from datetime import date, datetime
@@ -11,7 +12,7 @@ from typing import Tuple, List, Union
 import numpy as np
 import pandas as pd
 from omegaconf import OmegaConf
-from statemachine import StateMachine, State
+# from statemachine import StateMachine, State
 import telethon
 from telethon.sync import TelegramClient
 # from telethon import TelegramClient
@@ -25,20 +26,14 @@ from telethon.errors import (
     UsernameNotOccupiedError,
     MsgIdInvalidError,
 )
-from telethon.tl.types import MessageEntityMention
-# from telethon.errors.rpc_error_list import (ChannelPrivateError,
-#                                             FloodWaitError,
-#                                             RpcCallFailError,
-#                                             RpcMcgetFailError,
-#                                             UsernameInvalidError,
-#                                             UsernameNotOccupiedError)
-from telethon.tl.types import PeerChannel
+from telethon.tl.types import MessageEntityMention, PeerChannel
 from telethon import functions, types
 from telethon.tl.functions.channels import GetFullChannelRequest
 from telethon.tl.functions.messages import (
     GetSearchCountersRequest,
     GetRepliesRequest
 )
+import yaml
 # from tqdm import tqdm
 
 # from rutan_core.utils import get_channel_records_from_folder
@@ -47,11 +42,18 @@ from core.entities import (
     UserData, MessageData, ReplyData,
     ClientConfigSchema
 )
-from core.utils import is_processed, load_channel, mark_as_processing
+from core.utils import (
+    is_processed, 
+    load_channel, 
+    cool_exceptor,
+    mark_as_processing,
+    mark_as_error,
+    mark_as_ok 
+)
 
 
 
-class Crawler(StateMachine):
+class Crawler():
     '''
     this is the main class responsible for obtaining data from telegram
 
@@ -60,10 +62,6 @@ class Crawler(StateMachine):
     '''
     offset_date = date.fromisoformat("2020-01-01")
     messages_limit = 1000
-
-    # messages_folder = "data/messages/"
-    # already_parsed = "already_parsed/"
-    # non_existing_accounts_folder = "non_existing/"
     min_delay = 60
     max_delay = 180
     media_filters = [
@@ -76,37 +74,21 @@ class Crawler(StateMachine):
         types.InputMessagesFilterGif(),
     ]
 
-    # # states
-    # state_channel = State('Channel', initial=True)
-    # state_header = State('Header')
-    # state_chaters = State('Chaters')
-    # state_messages = State('Messages')
-    # state_messages_digger = State('MessagesDig')
-    # state_commenters = State('Commenters')  # optional state
-
-    # # transitions
-    # cycle = state_channel.to(state_header) | state_header.to(state_chaters) | \
-    #     state_chaters.to(state_messages) | state_messages.to(state_messages_digger) | \
-    #         state_messages_digger.to(state_commenters) | state_commenters.to(state_channel)
-    
-
     def __init__(
             self, user_profile, log_filename,
             config_path="configs/client_config.yml",
+            logging_config_path="configs/logger_config.yml",
             log_folder="logs/", already_parsed_path="already_parsed/",
             invalid_id_folder="invalid_ids/"):
         ''' reads config values, creates logger and authorizes the client if necessary '''
-        # self.already_parsed_path = already_parsed_path
-        # self.already_parsed_channels = None
-        # self.non_existing_accounts_path = self.non_existing_accounts_folder + "/" + log_filename
+
         self.config_path = config_path
         self.config = self.__load_config()
-        # self.invalid_id_path = invalid_id_folder + log_filename
-        # self.logger = logging.getLogger("rutan")
-        # self.log_filename = log_filename
-        # self.new_ids_usernames = "tmp/new_ids_usernames_mapping_" + log_filename
+        self.logging_config_path = logging_config_path
         self.client = self.__authorize()
-        # self.log_folder = log_folder
+        self.logger = logging.getLogger("client")
+        # self.invalid_id_path = invalid_id_folder + log_filename
+        # self.new_ids_usernames = "tmp/new_ids_usernames_mapping_" + log_filename
         # self.already_parsed = self.get_already_parsed()
         # self.non_existing = self.get_non_existing()
         # self.invalid_ids = get_channel_records_from_folder(invalid_id_folder)
@@ -129,6 +111,14 @@ class Crawler(StateMachine):
             return client
         else:
             raise Exception("Not authorized")
+    
+    def __init_logging(self):        
+        with open(self.logging_config_path) as config_fin:
+            config = yaml.safe_load(config_fin)
+            logging.config.dictConfig(config)
+            
+        # let's go
+        self.logger.debug("*** New run ***")
 
     def crawl(self, records, id_mode=False):
         ''' that is the main method responsible for the parse of the messages
@@ -136,132 +126,111 @@ class Crawler(StateMachine):
             TODO: complete the description
         '''
         self.__init_logging()
-        start_time = time()
         successful = 0
         while True:
             username = load_channel()
-        # for channel_record in tqdm(records):
-        #     # if id_mode:
-        #     #     username = channel_record  # it's in fact id and not url or name, in this case
-        #     # else:
-        #     #     username = channel_record.replace("@", "").lower()
+            start_time = time()
+            if username is None:
+                stop_message = "Crawling done, successful calls: {}"\
+                    .format(successful)
+                self.logger.info(stop_message)
+                self.notify(stop_message)
+                break
 
-            # if username in self.already_parsed or username in self.non_existing or username in self.invalid_ids:
             if is_processed(username):
+                self.logger.info('already parsed {}'.format(username))
                 continue
             mark_as_processing(username)
-            self.logger.info('started iteration for {}'.format(username))
-            try:
-                full_data = self.get_channel_full(username)
+            self.logger.info("started iteration for {}".format(username))
+            self.logger.info("run channel full extraction")
+            full_data = self.get_channel_full(username)
+            if full_data is None:
+                self.logger.info("cannot get channel full")
+                mark_as_error(username)
                 self.wait()
-                media_data = self.get_header_media_counts(username)
-                linked_chat_id = full_data.linked_chat_id
-                chat_users = []
-                if linked_chat_id is not None:
-                    chat_users = self.get_linked_chat_members(
-                        linked_chat_id, full_data)
+                continue
+            else:
+                self.logger.info("got channel full - username: {}, id: {}"\
+                    .format(full_data.username, full_data.channel_id))
 
-                messages = self.get_messages(username)
-                replies = []
-                reply_users = []
-                for msg in messages:
-                    if msg.replies_cnt > 0 and msg.replies is not None:
-                        cur_replies, cur_commenters = self.get_replies(
-                            username, msg.message_id)
-                        for reply in cur_replies:
-                            replies.append(reply)
-                        for user in cur_commenters:
-                            reply_users.append(user)
+            self.wait()
+            self.logger.info('run channel media counts extraction for {}'\
+                .format(username))
+            media_data = self.get_header_media_counts(username)
+            if media_data is None:
+                self.logger.info("cannot get channel media counts")
+                self.logger.info("continue crawling")
+                media_data = MediaChannelData()  # default zeros
+            else:
+                self.logger.info("media counts extracted")
 
-                delay_time = self.get_request_delay()
-                self.logger.info(
-                    'Going to sleep for {} seconds'.format(
-                        str(delay_time)))
-                sleep(delay_time)
+            self.wait()
+            linked_chat_id = full_data.linked_chat_id
+            chat_users = []
+            if linked_chat_id is not None:
+                self.logger.info("extract linked chat (id={}) users for {}"\
+                    .format(linked_chat_id, username))
+                chat_users = self.get_linked_chat_members(
+                    linked_chat_id, full_data)
+            else:
+                self.logger.info("There are no linked chat fo")
 
-                # self.save_messages_from_channel(channel)
-                successful += 1
-                delay_time = self.get_request_delay()
-                self.logger.info(
-                    'Going to sleep for {} seconds'.format(
-                        str(delay_time)))
-                sleep(delay_time)
-            # if we cann't get the channel, it means it doesn't really exist
-            # anymore
-            except (UsernameNotOccupiedError, UsernameInvalidError) as e:
-                self.logger.info("DOES_NOT_EXIST:{}".format(username))
-                # save non existing immediately
-                with open(self.non_existing_accounts_path, "a") as non_existing_file:
-                    print(username, file=non_existing_file)
-                delay_time = self.get_request_delay()
-                self.logger.info(
-                    'Taking an upset nap for {} seconds after stumbling on a non-existing channel'.format(str(delay_time)))
-            # ok internal issues it seems:
-            except (RpcCallFailError, RpcMcgetFailError) as e:
-                self.logger.error(
-                    "We got this internal error it seems, going to sleep for a while now and continue\n" +
-                    str(e))
-                delay_time = self.get_request_delay() * 5  # just sleep a bit longer
-                sleep(delay_time)
-            except FloodWaitError as e:
-                error_message = str(e)
-                time_to_sleep_flood = self.extract_flood_waiting_time(
-                    error_message) + self.get_request_delay() * 10
-                self.logger.error(
-                    "Got flood ban \n" +
-                    str(e) +
-                    "\n" +
-                    "going to sleep for {} seconds".format(
-                        str(time_to_sleep_flood)))
-                sleep(time_to_sleep_flood)
-            except (TypeError, ChannelPrivateError) as e:
-                with open(self.invalid_id_path, "a") as invalid_ids_file:
-                    print(channel_record, file=invalid_ids_file)
-                self.logger.info(e)
-            except RuntimeError as e:
-                if "retries" in str(
-                        e):  # ok that's easy, we just need to sleep and restart
-                    self.logger.error(
-                        "We got the number of retries error, I am going to sleep for a while now and then continue\n" +
-                        str(e))
-                    delay_time = self.get_request_delay() * 5  # just sleep a bit longer
-                    sleep(delay_time)
-                else:
-                    self.logger.critical("Weird runtime error \n" + str(e))
-                    self.write_final_stats(successful, start_time)
-                    bp()
-                    print('starting debuggin')
-            except Exception as e:  # ok, it seems like
-                self.logger.critical(
-                    "it seems like it's over for now \n" + str(e))
-                self.write_final_stats(successful, start_time)
-                bp()
-                print('starting debuggin')
-    
+            self.wait()
+            self.logger.info("extract messages from channel")
+            messages = self.get_messages(username)
+
+            # replies = []
+            # reply_users = []
+            # for msg in messages:
+            #     if msg.replies_cnt > 0 and msg.replies is not None:
+            #         cur_replies, cur_commenters = self.get_replies(
+            #             username, msg.message_id)
+            #         for reply in cur_replies:
+            #             replies.append(reply)
+            #         for user in cur_commenters:
+            #             reply_users.append(user)
+
+            delay_time = self.get_request_delay()
+            self.logger.info(
+                'Going to sleep for {} seconds'.format(
+                    str(delay_time)))
+            sleep(delay_time)
+
+            # self.save_messages_from_channel(channel)
+            successful += 1
+            delay_time = self.get_request_delay()
+            self.logger.info(
+                'Going to sleep for {} seconds'.format(
+                    str(delay_time)))
+            sleep(delay_time)
+            
+    @cool_exceptor
     def get_channel_full(
-            self, channel: Union[str, int]) -> Tuple[FullChannelData, Union[None, int]]:
+            self, channel: Union[str, int]) -> FullChannelData:
         """ channel is link or id"""
         full = self.client(GetFullChannelRequest(channel=channel))
         header = full.chats[0]
         linked_chat_id = full.full_chat.linked_chat_id
 
         data = FullChannelData(
-            header.id,
-            header.title,
-            header.username,
-            full.full_chat.about,
-            header.date,
-            full.full_chat.participants_count,
-            linked_chat_id,
+            channel_id=header.id,
+            title=header.title,
+            username=header.username,
+            about=full.full_chat.about,
+            date=header.date,
+            participants_count=full.full_chat.participants_count,
+            linked_chat_id=linked_chat_id,
         )
         return data
 
+    @cool_exceptor
     def get_linked_chat_members(self, chat_id: int, full_data: FullChannelData) -> List[UserData]:
         chat_members = self.client.get_participants(chat_id)
         data = [UserData(full_data.channel_id, x.id, x.bot, x.username)
                 for x in chat_members]
         return data
 
+    @cool_exceptor
     def get_header_media_counts(
             self, channel: Union[str, int]) -> MediaChannelData:
         """https://tl.telethon.dev/methods/messages/get_search_counters.html"""
@@ -272,6 +241,7 @@ class Crawler(StateMachine):
         data = MediaChannelData(*counts)
         return data
 
+    @cool_exceptor
     def get_messages(
             self, channel: Union[str, int], limit: int = None) -> List[MessageData]:
         """ return collected messages from oldest to newest
@@ -279,6 +249,7 @@ class Crawler(StateMachine):
         we can collect MessageReplies and release from them short info
         about commenters : List[PeerUser(user_id: int)]
         """
+        self.logger.info("Extract messages from: {}".format(channel))
         limit = limit or self.messages_limit
         messages = self.client.get_messages(
             entity=channel,
@@ -286,6 +257,7 @@ class Crawler(StateMachine):
             offset_date=self.offset_date,
             reverse=True,
         )
+        self.logger.info("Extracted {} messages from".format(len(messages)))
         data = []
         for msg in messages:
             replies = msg.replies
@@ -319,6 +291,7 @@ class Crawler(StateMachine):
             data.append(cur_message_data)
         return data
 
+    @cool_exceptor
     def get_replies(
         self,
         channel: Union[str, int],
@@ -459,18 +432,6 @@ class Crawler(StateMachine):
         self.logger.info("time spent in seconds:{}".format(str(spent_time)))
         self.logger.info("***END***")
 
-    def __init_logging(self):
-        log_file = self.log_folder + self.log_filename
-        logger = logging.getLogger('rutan')
-        logger.setLevel(logging.DEBUG)
-        fh = logging.FileHandler(log_file)
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
-        # let's go
-        logger.debug("*** New run ***")
-
     def create_temporal_dataset(self, inputpath, outpath):
         ''' creates a temporal dataset of only records that are still not parsed '''
         df = pd.read_csv(inputpath, sep=";")
@@ -479,9 +440,3 @@ class Crawler(StateMachine):
         out_df = df[~(urls.isin(self.already_parsed) | urls.isin(
             self.non_existing)) & (df['Тип (Группа/Канал)'] == "канал")]
         out_df.to_csv(outpath, sep=";")
-
-    @staticmethod
-    def extract_flood_waiting_time(error_message):
-        ''' Extract time from the messages like "A wait of 30716 seconds is required" '''
-        m = re.search("\\d+", error_message)
-        return int(m.group(0))

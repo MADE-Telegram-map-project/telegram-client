@@ -4,3 +4,4 @@ client1.session-journal
 env*
 telegram_client.egg-info
 *__pycache__
+logs/crawler_runs.log

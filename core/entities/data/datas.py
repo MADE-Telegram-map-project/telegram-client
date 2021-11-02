@@ -10,7 +10,7 @@ from telethon.tl.types import MessageReplies
 class FullChannelData:
     channel_id: int
     title: str
-    link: str
+    username: str
     about: str
     date: datetime.datetime
     participants_count: int
@@ -19,13 +19,13 @@ class FullChannelData:
 
 @dataclass
 class MediaChannelData:
-    photo: int
-    video: int
-    document: int
-    music: int
-    url: int
-    voice: int
-    gif: int
+    photo: int = 0
+    video: int = 0
+    document: int = 0
+    music: int = 0
+    url: int = 0
+    voice: int = 0
+    gif: int = 0
 
 
 @dataclass

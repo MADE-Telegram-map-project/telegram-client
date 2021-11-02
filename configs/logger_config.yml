@@ -1,0 +1,24 @@
+version: 1
+formatters:
+  simple:
+    class: logging.Formatter
+    format: "%(asctime)s %(name)s %(levelname)s %(message)s"
+    datefmt: "%Y-%m-%d %H:%M:%S"
+handlers:
+  full_file_handler:
+    class: logging.FileHandler
+    filename: logs/crawler_runs.log
+    level: DEBUG
+    formatter: simple
+  info_stream_handler:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: simple
+loggers:
+  client:
+    level: DEBUG
+    handlers: [full_file_handler]
+    propagate: yes
+root:
+  level: DEBUG
+  handlers: [info_stream_handler]
