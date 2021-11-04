@@ -39,21 +39,30 @@ def run_crawler():
     return locals()
 
 
+
+
 def main():
-    # ch = 1149710531
+    ch = 1149710531  # latina
     # mid = 2581
-    ch = "gagaga_momomo111"
+    # ch = "gagaga_momomo"
 
     crawler = Crawler("user_profile", "log_filename")
-    # crawler.get_commenters(ch, mid)
-    n_messages = 50
-    messages = crawler.get_messages(ch, n_messages)
-    print(messages)
-    sleep(2)
+    crawler.crawl()
+    # full, raw_full = crawler.get_channel_full(ch)
+    # media = crawler.get_header_media_counts(ch)
+    # linked_chat_memgers = crawler.get_linked_chat_members(
+    #     full.linked_chat_id)
+    # sleep(2)
+    
+    # n_messages = 10
+    # messages, messages_raw = crawler.get_messages(ch, n_messages)
+    # print(messages)
+    # sleep(2)
 
     # for msg in messages:
-    #     replies, commenters = crawler.get_replies(ch, msg.message_id)
-    #     sleep(1)
+    #     if msg.replies_cnt > 0:
+    #         replies, commenters = crawler.get_replies(ch, msg.message_id)
+    #         sleep(1)
 
 
 

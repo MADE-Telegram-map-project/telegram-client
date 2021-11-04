@@ -6,7 +6,6 @@ from .data import (
     mark_as_ok,
     mark_as_processing,
     save_to_db,
-    save_to_json
 )
 
 __all__ = [
@@ -17,5 +16,4 @@ __all__ = [
     "mark_as_ok",
     "mark_as_processing",
     "save_to_db",
-    "save_to_json",
 ]
