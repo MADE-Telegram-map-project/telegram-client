@@ -4,10 +4,10 @@ import random
 from typing import Union
 
 
-def load_channel() -> Union[int, str]:
+def load_channel(idx: int) -> Union[int, str]:
     """ load channel from queue """
-    my_channels = [1149710531, "gagaga_momomo"]
-    return random.sample(my_channels, 1)[0]
+    my_channels = ["gagaga_momomo", "gudim_public", 1149710531]
+    return my_channels[idx]
 
 
 def is_processed(channel) -> bool:

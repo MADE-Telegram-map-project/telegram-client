@@ -139,7 +139,7 @@ class Crawler():
         self.__init_logging()
         successful = 0
         while True:
-            username = load_channel()
+            username = load_channel(successful)
             start_time = time()
             if username is None:
                 stop_message = "Crawling done, successful calls: {}"\
@@ -218,7 +218,7 @@ class Crawler():
             mark_as_ok(username)
             successful += 1
             spent_time = time() - start_time
-            self.logger.info("Channel {} done in {} seconds".format(
+            self.logger.info("Channel {} done in {:.2f} seconds".format(
                 channel_id, spent_time))
             self.wait()
 
@@ -314,7 +314,7 @@ class Crawler():
         self,
         channel_id: int,
         message_id: int,
-    ) -> Tuple[List[ReplyData], List[UserData], ChannelMessages]:
+        ) -> Tuple[List[ReplyData], List[UserData], ChannelMessages]:
         """ run only if message has replies obj OR if replies_cnt > 0 """
         try:
             comments = self.client(GetRepliesRequest(
@@ -396,38 +396,37 @@ class Crawler():
         """ dump TLObject inheritor to file
 
         params:
-            - obj
             - label: {"full", "linked_chat", "media", "messages", "replies"}
-
         """
         assert isinstance(channel_id, int), "channel_id must be integer"
-        assert "to_json" in dir(
-            obj), "cannot dump object, it doesn't have .to_json"
-        if not os.path.exist(self.dump_path):
+        # assert "to_json" in dir(
+        #     obj), "cannot dump object, it doesn't have .to_json"
+        if not os.path.exists(self.dump_path):
             os.mkdir(self.dump_path)
 
         channel_path = os.path.join(self.dump_path, str(channel_id))
-        if not os.path.exist(channel_path):
+        if not os.path.exists(channel_path):
             os.mkdir(channel_path)
 
         filepath = os.path.join(channel_path, "{}.json".format(label))
-        if label == "full":
-            with open(filepath) as fp:
+        with open(filepath, "w") as fp:
+            if label == "full":
                 obj.to_json(fp, ensure_ascii=False)
 
-        elif label in {"messages", "linked_chat", "media"}:
-            new_obj = [msg.to_dict() for msg in obj]
-            with open(filepath) as fp:
-                json.dump(new_obj, fp, ensure_ascii=False)
-        
-        elif label == "replies":
-            new_obj = [msg.to_dict() for msg in obj]
-            # with open(filepath) as fp:
-            #     json.dump(new_obj, fp, ensure_ascii=False)
-            # TODO dump replies, in "replies/meddage_id.json"
-            # need to pass meddage_id into this function
-
-        self.logger.info("{} dumped in {}".format(label, filepath))
+            elif label in {"messages", "linked_chat", "media"}:
+                new_obj = [msg.to_dict() for msg in obj]
+                json.dump(
+                    new_obj, fp, default=self.json_serial, ensure_ascii=False)
+            
+            elif label == "replies":
+                new_obj = [msg.to_dict() for msg in obj]
+                # with open(filepath) as fp:
+                #     json.dump(new_obj, fp, ensure_ascii=False)
+                # TODO dump replies, in "replies/meddage_id.json"
+                # need to pass meddage_id into this function
+            else:
+                raise ValueError("label '{}' unsupported")
+        self.logger.info("{} dumped in {}".format(label.capitalize(), filepath))
 
     def is_channel(self, link: str) -> Tuple[bool, Union[None, int]]:
         """ check if link is channel link and return indicator and channel_id """
@@ -436,15 +435,15 @@ class Crawler():
             return True, entity["channel_id"]
         return False, None
 
-    # @staticmethod
-    # def json_serial(obj):
-    #     """JSON serializer for objects not serializable by default json code"""
+    @staticmethod
+    def json_serial(obj):
+        """JSON serializer for objects not serializable by default json code"""
 
-    #     if isinstance(obj, (datetime, date)):
-    #         return obj.isoformat()
-    #     if isinstance(obj, bytes):
-    #         return "here we some bytes"
-    #     raise TypeError("Type %s not serializable" % type(obj))
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        if isinstance(obj, bytes):
+            return "here we some bytes"
+        raise TypeError("Type %s not serializable" % type(obj))
 
     def get_request_delay(self):
         ''' we need to set up a delay between requests, it must be a random number '''
@@ -454,8 +453,7 @@ class Crawler():
     def wait(self, delay: int = None, to_log=True):
         delay = delay or self.get_request_delay()
         if to_log:
-            self.logger.info('going to sleep for {} seconds'
-                             .format(str(delay_time)))
+            self.logger.info('Going to sleep for {} sec'.format(str(delay)))
         sleep(delay)
 
     # def get_already_parsed(self):

@@ -48,14 +48,22 @@ def main():
 
     crawler = Crawler("user_profile", "log_filename")
     crawler.crawl()
-    # full, raw_full = crawler.get_channel_full(ch)
-    # media = crawler.get_header_media_counts(ch)
-    # linked_chat_memgers = crawler.get_linked_chat_members(
-    #     full.linked_chat_id)
+
+    # full, full_raw = crawler.get_channel_full(ch)
+    # crawler.save_to_json(full_raw, "full", ch)
+    # sleep(2)
+    # media, media_raw = crawler.get_header_media_counts(ch)
+    # crawler.save_to_json(media_raw, "media", ch)
+    # sleep(2)
+    # lch_members, lch_members_raw = crawler.get_linked_chat_members(
+    #     ch, full.linked_chat_id)
+    # crawler.save_to_json(lch_members_raw, "linked_chat", ch)
     # sleep(2)
     
     # n_messages = 10
     # messages, messages_raw = crawler.get_messages(ch, n_messages)
+    # crawler.save_to_json(messages_raw, "messages", ch)    
+    
     # print(messages)
     # sleep(2)
 

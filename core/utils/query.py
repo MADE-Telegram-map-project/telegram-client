@@ -29,6 +29,8 @@ def cool_exceptor(func):
                 self.logger.critical(
                     "After {} times of waiting there are no progress"
                     .format(retries))
+                delay_time = self.get_request_delay() * 5  # a bit longer
+                sleep(delay_time)
                 return None
 
             retries += 1
