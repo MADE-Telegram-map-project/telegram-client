@@ -81,13 +81,11 @@ class Crawler():
     ]
 
     def __init__(
-            self, user_profile, log_filename,
+            self,
             config_path="configs/client_config.yml",
             logging_config_path="configs/logger_config.yml",
-            log_folder="logs/",
             dump_path="data/raw",
-            already_parsed_path="already_parsed/",
-            invalid_id_folder="invalid_ids/"):
+            ):
         '''
         reads config values, creates logger and
         authorizes the client if necessary
@@ -99,7 +97,7 @@ class Crawler():
         self.client = self.__authorize()
         self.logger = logging.getLogger("client")
         self.dump_path = dump_path
-        self.channel_id = None
+        # self.channel_id = None
         # self.invalid_id_path = invalid_id_folder + log_filename
         # self.new_ids_usernames = "tmp/new_ids_usernames_mapping_" + log_filename
         # self.already_parsed = self.get_already_parsed()
@@ -165,7 +163,7 @@ class Crawler():
             else:
                 full_data, full_data_raw = full_data
                 channel_id = full_data.channel_id
-                self.channel_id = channel_id
+                # self.channel_id = channel_id
                 self.logger.info(
                     "Got channel full - username: {}, id: {}".format(
                         full_data.username, channel_id))
@@ -434,6 +432,10 @@ class Crawler():
         if entity["_"] == "InputPeerChannel":
             return True, entity["channel_id"]
         return False, None
+
+    def notify(self, message: str, user: str):
+        """ send `message` (notification) to @user """
+        self.client.send_message(user, message)
 
     @staticmethod
     def json_serial(obj):

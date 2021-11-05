@@ -1,6 +1,7 @@
 from time import sleep
 
 from core.crawler import Crawler
+from core.utils.link_extractor import extract_usernames
 
 
 
@@ -42,14 +43,14 @@ def run_crawler():
 
 
 def main():
-    ch = 1149710531  # latina
+    # ch = 1149710531  # latina
     # mid = 2581
-    # ch = "gagaga_momomo"
+    ch = "gagaga_momomo"
 
-    crawler = Crawler("user_profile", "log_filename")
-    crawler.crawl()
+    crawler = Crawler()
+    # crawler.crawl()
 
-    # full, full_raw = crawler.get_channel_full(ch)
+    full, full_raw = crawler.get_channel_full(ch)
     # crawler.save_to_json(full_raw, "full", ch)
     # sleep(2)
     # media, media_raw = crawler.get_header_media_counts(ch)
@@ -60,8 +61,11 @@ def main():
     # crawler.save_to_json(lch_members_raw, "linked_chat", ch)
     # sleep(2)
     
-    # n_messages = 10
-    # messages, messages_raw = crawler.get_messages(ch, n_messages)
+    n_messages = 10
+    messages, messages_raw = crawler.get_messages(ch, n_messages)
+
+    nei_usernames = extract_usernames(full.about, messages_raw)
+
     # crawler.save_to_json(messages_raw, "messages", ch)    
     
     # print(messages)

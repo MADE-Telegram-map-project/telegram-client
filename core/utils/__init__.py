@@ -1,4 +1,5 @@
 from .query import cool_exceptor
+from .link_extractor import extract_usernames
 from .data import (
     is_processed,
     load_channel,
@@ -10,6 +11,7 @@ from .data import (
 
 __all__ = [
     "cool_exceptor",
+    "extract_usernames",
     "is_processed",
     "load_channel",
     "mark_as_error",

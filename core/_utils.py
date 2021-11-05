@@ -29,16 +29,16 @@ from time import sleep
 # )
 
 
-def notify(client, message: str, user: str):
-    """ send `message` (notification) to @user """
-    client.send_message(user, message)
+# def notify(client, message: str, user: str):
+#     """ send `message` (notification) to @user """
+#     client.send_message(user, message)
 
 
 
-def is_channel(client, link: str) -> tuple:
-    """ check if link is channel link and return indicator and channel_id """
-    entity = client.get_input_entity(link).to_dict()
-    if entity["_"] == "InputPeerChannel":
-        return True, entity["channel_id"]
-    return False, None
+# def is_channel(client, link: str) -> tuple:
+#     """ check if link is channel link and return indicator and channel_id """
+#     entity = client.get_input_entity(link).to_dict()
+#     if entity["_"] == "InputPeerChannel":
+#         return True, entity["channel_id"]
+#     return False, None
 
