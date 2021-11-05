@@ -33,7 +33,8 @@ class Crawler():
     each method get_* do "one" query to api
 
     '''
-    messages_limit = 1000
+    min_participants_count = 5000
+    messages_limit = 3000
     min_delay = 60
     max_delay = 120  # 180
     media_filters = [
@@ -138,21 +139,26 @@ class Crawler():
                 # TODO save full
 
             self.wait()
+            _pc = full_data.participants_count
+            if _pc < self.min_participants_count:
+                self.logger.info(
+                    'Small channel, {} participants, pass it'.format(_pc))
+                continue
 
             ########## MEDIA ##########
-            # self.logger.info('Run channel media counts extraction')
-            # media_data = self.get_header_media_counts(channel_id)
-            # if media_data is None:
-            #     self.logger.error("Cannot get channel media counts")
-            #     self.logger.info("Continue crawling")
-            #     media_data = (MediaChannelData(), None)  # default zeros
-            # else:
-            #     self.logger.info("Media counts extracted")
-            #     media_data, media_data_raw = media_data
-            #     self.save_to_json(media_data_raw, "media", channel_id)
-            #     # TODO save media counts
+            self.logger.info('Run channel media counts extraction')
+            media_data = self.get_header_media_counts(channel_id)
+            if media_data is None:
+                self.logger.error("Cannot get channel media counts")
+                self.logger.info("Continue crawling")
+                media_data = (MediaChannelData(), None)  # default zeros
+            else:
+                self.logger.info("Media counts extracted")
+                media_data, media_data_raw = media_data
+                self.save_to_json(media_data_raw, "media", channel_id)
+                # TODO save media counts
 
-            # self.wait()
+            self.wait()
 
             ########## CHAT ##########
             chat_users = []
