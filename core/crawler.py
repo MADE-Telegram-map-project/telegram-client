@@ -50,9 +50,10 @@ from core.entities import (
     ClientConfigSchema
 )
 from core.utils import (
+    cool_exceptor,
+    extract_usernames,
     is_processed,
     load_channel,
-    cool_exceptor,
     mark_as_processing,
     mark_as_error,
     mark_as_ok
@@ -69,7 +70,7 @@ class Crawler():
     # offset_date = date.fromisoformat("2020-01-01")
     messages_limit = 1000
     min_delay = 60
-    max_delay = 180
+    max_delay = 120  # 180
     media_filters = [
         types.InputMessagesFilterPhotos(),
         types.InputMessagesFilterVideo(),
@@ -135,7 +136,7 @@ class Crawler():
             TODO: complete the description
         '''
         self.__init_logging()
-        successful = 0
+        successful = 3
         while True:
             username = load_channel(successful)
             start_time = time()
@@ -143,7 +144,7 @@ class Crawler():
                 stop_message = "Crawling done, successful calls: {}"\
                     .format(successful)
                 self.logger.info(stop_message)
-                self.notify(stop_message)
+                self.notify(stop_message, "kpotoh")
                 break
 
             if is_processed(username):
@@ -153,10 +154,11 @@ class Crawler():
             mark_as_processing(username)
             self.logger.info("Started iteration for {}".format(username))
 
+            ########## FULL ##########
             self.logger.info("Run channel full extraction")
             full_data = self.get_channel_full(username)
             if full_data is None:
-                self.logger.error("Cannot get channel full")
+                self.logger.info("Cannot get channel full; go to next chanel")
                 mark_as_error(username)
                 self.wait()
                 continue
@@ -171,37 +173,43 @@ class Crawler():
                 # TODO save full
 
             self.wait()
-            self.logger.info('Run channel media counts extraction')
-            media_data = self.get_header_media_counts(channel_id)
-            if media_data is None:
-                self.logger.error("Cannot get channel media counts")
-                self.logger.info("Continue crawling")
-                media_data = (MediaChannelData(), None)  # default zeros
-            else:
-                self.logger.info("Media counts extracted")
-                media_data, media_data_raw = media_data
-                self.save_to_json(media_data_raw, "media", channel_id)
-                # TODO save media counts
 
-            self.wait()
-            chat_users = []
-            if full_data.linked_chat_id is not None:
-                self.logger.info("Extract linked chat (id={}) users")
-                chat_users = self.get_linked_chat_members(
-                    channel_id, full_data.linked_chat_id)
-                if chat_users is None:
-                    self.logger.error("Cannot get linked chat users")
-                else:
-                    self.logger.info("{} users extracted from linked chat"
-                                     .format(len(chat_users[0])))
-                    chat_users, chat_users_raw = chat_users
-                    self.save_to_json(
-                        chat_users_raw, "linked_chat", channel_id)
-                    # TODO save chat users
-            else:
-                self.logger.info("There are no linked chat")
+            ########## MEDIA ##########
+            # self.logger.info('Run channel media counts extraction')
+            # media_data = self.get_header_media_counts(channel_id)
+            # if media_data is None:
+            #     self.logger.error("Cannot get channel media counts")
+            #     self.logger.info("Continue crawling")
+            #     media_data = (MediaChannelData(), None)  # default zeros
+            # else:
+            #     self.logger.info("Media counts extracted")
+            #     media_data, media_data_raw = media_data
+            #     self.save_to_json(media_data_raw, "media", channel_id)
+            #     # TODO save media counts
 
-            self.wait()
+            # self.wait()
+
+            ########## CHAT ##########
+            # chat_users = []
+            # if full_data.linked_chat_id is not None:
+            #     self.logger.info("Extract linked chat (id={}) users")
+            #     chat_users = self.get_linked_chat_members(
+            #         channel_id, full_data.linked_chat_id)
+            #     if chat_users is None:
+            #         self.logger.error("Cannot get linked chat users")
+            #     else:
+            #         self.logger.info("{} users extracted from linked chat"
+            #                          .format(len(chat_users[0])))
+            #         chat_users, chat_users_raw = chat_users
+            #         self.save_to_json(
+            #             chat_users_raw, "linked_chat", channel_id)
+            #         # TODO save chat users
+            # else:
+            #     self.logger.info("There are no linked chat")
+
+            # self.wait()
+
+            ########## MESSAGES ##########
             self.logger.info("Start retrieving of messages from channel")
             messages = self.get_messages(channel_id)
             if messages is None:
@@ -212,6 +220,13 @@ class Crawler():
                 messages, messages_raw = messages
                 self.save_to_json(messages_raw, "messages", channel_id)
                 # TODO save messages
+            
+            ########## NEW CHANNELS ##########
+            self.logger.info(
+                "Start extraction of new usernames from messages and about")
+            new_channels = extract_usernames(full_data.about, messages_raw)
+            self.logger.info("Extracted {} new potential channels"\
+                .format(len(new_channels)))
 
             mark_as_ok(username)
             successful += 1

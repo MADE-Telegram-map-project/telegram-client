@@ -6,7 +6,8 @@ from typing import Union
 
 def load_channel(idx: int) -> Union[int, str]:
     """ load channel from queue """
-    my_channels = ["gagaga_momomo", "gudim_public", 1149710531]
+    my_channels = [
+        "gagaga_momomo121", "gagaga_momomo", "gudim_public", 1149710531, None]
     return my_channels[idx]
 
 

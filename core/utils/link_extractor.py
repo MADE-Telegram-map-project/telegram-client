@@ -70,20 +70,23 @@ def extract_usernames_from_entities(msg: Message) -> List[str]:
         return usernames
 
     for ent in msg.entities:
-        if isinstance(ent, MessageEntityMention):
-            username = text[ent.offset + 1:ent.offset + ent.length]
-            usernames.append(username)
+        try:
+            if isinstance(ent, MessageEntityMention):
+                username = text[ent.offset + 1:ent.offset + ent.length]
+                usernames.append(username)
 
-        elif isinstance(ent, MessageEntityTextUrl):
-            links = extract_usernames_from_text(ent.url + ' ')
-            if len(links) == 1:
-                usernames.append(links[0])
+            elif isinstance(ent, MessageEntityTextUrl):
+                links = extract_usernames_from_text(ent.url + ' ')
+                if len(links) == 1:
+                    usernames.append(links[0])
 
-        elif isinstance(ent, MessageEntityUrl):
-            url = text[ent.offset:ent.offset + ent.length] + ' '
-            links = extract_usernames_from_text(url)
-            if len(links) == 1:
-                usernames.append(links[0])
+            elif isinstance(ent, MessageEntityUrl):
+                url = text[ent.offset:ent.offset + ent.length] + ' '
+                links = extract_usernames_from_text(url)
+                if len(links) == 1:
+                    usernames.append(links[0])
+        except Exception as e:
+            print(repr(e))
     return usernames
 
 
@@ -91,13 +94,16 @@ def extract_usernames_from_media(msg: Message) -> List[str]:
     usernames = []
     if msg.media is None:
         return usernames
-
-    if isinstance(msg.media, MessageMediaWebPage):
-        if msg.media.webpage.type == "telegram_channel":
-            url = msg.media.webpage.url + ' '
-            links = extract_usernames_from_text(url)
-            if len(links) == 1:
-                usernames.append(links[0])
+    try:
+        if isinstance(msg.media, MessageMediaWebPage):
+            d = msg.media.to_dict()
+            if msg.media.webpage.type == "telegram_channel":
+                url = msg.media.webpage.url + ' '
+                links = extract_usernames_from_text(url)
+                if len(links) == 1:
+                    usernames.append(links[0])
+    except Exception as e:
+        print(repr(e))
     return usernames
 
 

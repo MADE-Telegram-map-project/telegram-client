@@ -48,9 +48,9 @@ def main():
     ch = "gagaga_momomo"
 
     crawler = Crawler()
-    # crawler.crawl()
+    crawler.crawl()
 
-    full, full_raw = crawler.get_channel_full(ch)
+    # full, full_raw = crawler.get_channel_full(ch)
     # crawler.save_to_json(full_raw, "full", ch)
     # sleep(2)
     # media, media_raw = crawler.get_header_media_counts(ch)
@@ -61,10 +61,10 @@ def main():
     # crawler.save_to_json(lch_members_raw, "linked_chat", ch)
     # sleep(2)
     
-    n_messages = 10
-    messages, messages_raw = crawler.get_messages(ch, n_messages)
+    # n_messages = 10
+    # messages, messages_raw = crawler.get_messages(ch, n_messages)
 
-    nei_usernames = extract_usernames(full.about, messages_raw)
+    # nei_usernames = extract_usernames(full.about, messages_raw)
 
     # crawler.save_to_json(messages_raw, "messages", ch)    
     
