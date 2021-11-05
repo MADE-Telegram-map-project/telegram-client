@@ -50,6 +50,8 @@ def main():
     crawler = Crawler()
     crawler.crawl()
 
+    # crawler.is_channel(ch)
+
     # full, full_raw = crawler.get_channel_full(ch)
     # crawler.save_to_json(full_raw, "full", ch)
     # sleep(2)

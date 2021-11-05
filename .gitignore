@@ -6,3 +6,4 @@ telegram_client.egg-info
 *__pycache__
 logs/crawler_runs.log
 data/raw/
+check_env

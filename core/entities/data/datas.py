@@ -45,9 +45,9 @@ class MessageData:
     views: int
     forwards: int
     replies_cnt: int
-    fwd_channel_id: int
-    fwd_message_id: int
-    replies: MessageReplies = None
+    fwd_channel_id: Union[int, None]
+    fwd_message_id: Union[int, None]
+    replies: Union[MessageReplies, None] = None
 
 
 @dataclass

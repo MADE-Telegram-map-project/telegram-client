@@ -3,6 +3,11 @@ import os
 import random
 from typing import Union
 
+from core.entities import (
+    FullChannelData, MediaChannelData,
+    UserData, MessageData, ReplyData,
+)
+
 
 def load_channel(idx: int) -> Union[int, str]:
     """ load channel from queue """

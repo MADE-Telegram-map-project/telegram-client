@@ -1,63 +1,29 @@
-from datetime import date
-# import getpass  # so the password is hidden when typed
 import json
 import logging
 import logging.config
 import os
-import re
-from datetime import date, datetime
 import random
+from datetime import date, datetime
 from time import sleep, time
-from typing import Tuple, List, Union
+from typing import List, Tuple, Union
 
-import numpy as np
-import pandas as pd
-from omegaconf import OmegaConf
-# from statemachine import StateMachine, State
-import telethon
-from telethon.sync import TelegramClient
-# from telethon import TelegramClient
-from telethon.errors import SessionPasswordNeededError
-from telethon.errors import (
-    ChannelPrivateError,
-    FloodWaitError,
-    RpcCallFailError,
-    RpcMcgetFailError,
-    UsernameInvalidError,
-    UsernameNotOccupiedError,
-    MsgIdInvalidError,
-)
-from telethon.tl.types import (
-    MessageEntityMention,
-    InputPeerChannel,
-    PeerChannel,
-    MessageService,
-    TLObject
-)
-from telethon.tl.types.messages import ChannelMessages, ChatFull, SearchCounter
-from telethon.helpers import TotalList
-from telethon import functions, types
-from telethon.tl.functions.channels import GetFullChannelRequest
-from telethon.tl.functions.messages import (
-    GetSearchCountersRequest,
-    GetRepliesRequest
-)
 import yaml
+from omegaconf import OmegaConf
+from telethon import types
+from telethon.errors import MsgIdInvalidError
+from telethon.helpers import TotalList
+from telethon.sync import TelegramClient
+from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon.tl.functions.messages import (GetRepliesRequest,
+                                            GetSearchCountersRequest)
+from telethon.tl.types import InputPeerChannel, PeerChannel, TLObject
+from telethon.tl.types.messages import ChannelMessages, ChatFull, SearchCounter
 
-from core.entities import (
-    FullChannelData, MediaChannelData,
-    UserData, MessageData, ReplyData,
-    ClientConfigSchema
-)
-from core.utils import (
-    cool_exceptor,
-    extract_usernames,
-    is_processed,
-    load_channel,
-    mark_as_processing,
-    mark_as_error,
-    mark_as_ok
-)
+from core.entities import (ClientConfigSchema, FullChannelData,
+                           MediaChannelData, MessageData, ReplyData, UserData)
+from core.utils import (cool_exceptor, extract_usernames, is_processed,
+                        load_channel, mark_as_error, mark_as_ok,
+                        mark_as_processing)
 
 
 class Crawler():
@@ -67,7 +33,6 @@ class Crawler():
     each method get_* do "one" query to api
 
     '''
-    # offset_date = date.fromisoformat("2020-01-01")
     messages_limit = 1000
     min_delay = 60
     max_delay = 120  # 180
@@ -86,7 +51,8 @@ class Crawler():
             config_path="configs/client_config.yml",
             logging_config_path="configs/logger_config.yml",
             dump_path="data/raw",
-            ):
+            activate_logging=False,
+    ):
         '''
         reads config values, creates logger and
         authorizes the client if necessary
@@ -98,12 +64,9 @@ class Crawler():
         self.client = self.__authorize()
         self.logger = logging.getLogger("client")
         self.dump_path = dump_path
-        # self.channel_id = None
-        # self.invalid_id_path = invalid_id_folder + log_filename
-        # self.new_ids_usernames = "tmp/new_ids_usernames_mapping_" + log_filename
-        # self.already_parsed = self.get_already_parsed()
-        # self.non_existing = self.get_non_existing()
-        # self.invalid_ids = get_channel_records_from_folder(invalid_id_folder)
+        self.activate_logging = activate_logging
+        if activate_logging:
+            self.__init_logging()
 
     def __load_config(self) -> ClientConfigSchema:
         base_config = OmegaConf.load(self.config_path)
@@ -122,6 +85,7 @@ class Crawler():
         if client.is_user_authorized():
             return client
         else:
+            self.logger.critical("Not authorized")
             raise Exception("Not authorized")
 
     def __init_logging(self):
@@ -135,8 +99,9 @@ class Crawler():
         ''' that is the main method responsible for the parse of the messages
             TODO: complete the description
         '''
-        self.__init_logging()
-        successful = 3
+        if not self.activate_logging:
+            self.__init_logging()
+        successful = 3  # TODO replace by 0
         while True:
             username = load_channel(successful)
             start_time = time()
@@ -190,24 +155,25 @@ class Crawler():
             # self.wait()
 
             ########## CHAT ##########
-            # chat_users = []
-            # if full_data.linked_chat_id is not None:
-            #     self.logger.info("Extract linked chat (id={}) users")
-            #     chat_users = self.get_linked_chat_members(
-            #         channel_id, full_data.linked_chat_id)
-            #     if chat_users is None:
-            #         self.logger.error("Cannot get linked chat users")
-            #     else:
-            #         self.logger.info("{} users extracted from linked chat"
-            #                          .format(len(chat_users[0])))
-            #         chat_users, chat_users_raw = chat_users
-            #         self.save_to_json(
-            #             chat_users_raw, "linked_chat", channel_id)
-            #         # TODO save chat users
-            # else:
-            #     self.logger.info("There are no linked chat")
+            chat_users = []
+            if full_data.linked_chat_id is not None:
+                self.logger.info("Extract linked chat (id={}) users"
+                    .format(full_data.linked_chat_id))
+                chat_users = self.get_linked_chat_members(
+                    channel_id, full_data.linked_chat_id)
+                if chat_users is None:
+                    self.logger.error("Cannot get linked chat users")
+                else:
+                    self.logger.info("{} users extracted from linked chat"
+                                     .format(len(chat_users[0])))
+                    chat_users, chat_users_raw = chat_users
+                    self.save_to_json(
+                        chat_users_raw, "linked_chat", channel_id)
+                    # TODO save chat users
+            else:
+                self.logger.info("There are no linked chat")
 
-            # self.wait()
+            self.wait()
 
             ########## MESSAGES ##########
             self.logger.info("Start retrieving of messages from channel")
@@ -220,13 +186,13 @@ class Crawler():
                 messages, messages_raw = messages
                 self.save_to_json(messages_raw, "messages", channel_id)
                 # TODO save messages
-            
+
             ########## NEW CHANNELS ##########
             self.logger.info(
                 "Start extraction of new usernames from messages and about")
             new_channels = extract_usernames(full_data.about, messages_raw)
-            self.logger.info("Extracted {} new potential channels"\
-                .format(len(new_channels)))
+            self.logger.info("Extracted {} new potential channels"
+                             .format(len(new_channels)))
 
             mark_as_ok(username)
             successful += 1
@@ -300,12 +266,11 @@ class Crawler():
                 fwd_channel_id = None
                 fwd_message_id = None
             else:
-                if isinstance(msg.fwd_from.from_id, types.PeerChannel):
+                if isinstance(msg.fwd_from.from_id, PeerChannel):
                     fwd_channel_id = msg.fwd_from.from_id.channel_id
                 else:
                     fwd_channel_id = None
-
-                fwd_message_id = msg.fwd_from.channel_post  # TODO check
+                fwd_message_id = msg.fwd_from.channel_post
 
             cur_message_data = MessageData(
                 message_id=msg.id,
@@ -327,7 +292,7 @@ class Crawler():
         self,
         channel_id: int,
         message_id: int,
-        ) -> Tuple[List[ReplyData], List[UserData], ChannelMessages]:
+    ) -> Tuple[List[ReplyData], List[UserData], ChannelMessages]:
         """ run only if message has replies obj OR if replies_cnt > 0 """
         try:
             comments = self.client(GetRepliesRequest(
@@ -360,60 +325,15 @@ class Crawler():
 
         return replies, commenters, comments
 
-    def save_messages_from_channel(self, channel):
-        '''
-        given a channgel(link|id) it asks for all messages and saves them as json
-        '''
-        self.logger.info("PROCESSING_CHANNEL:{}".format(channel.username))
-        start_time = time()
-        self.logger.info(
-            "started retrieving messages from the channel: {}".format(
-                channel.username))
-        messages = self.client.get_message_history(channel, limit=10000)
-        end_time = time()
-        self.logger.info(
-            "Overall number of messages: {}".format(
-                channel.username))
-        self.logger.info(
-            "finished retrieving messages from the channel: {}".format(
-                channel.username))
-        timing = end_time - start_time
-        self.logger.info(
-            "Retrieved number of messages: {} Overall time: {} for channel: {}".format(
-                len(messages), int(timing), channel.username))
-        path = self.messages_folder + channel.username + ".json"
-        open(path, 'w').close()  # just cleaning the file
-        self.logger.info(
-            "started saving messages from the channel: {}".format(
-                channel.username))
-        messages = [message.to_dict() for message in messages]
-        with open(path, "a") as output, open(self.already_parsed_path + self.log_filename, "a") as already_parsed_file:
-            json.dump(messages, output, default=self.json_serial)
-            print(channel.username.lower(), file=already_parsed_file)
-        self.logger.info(
-            "finished saving messages from the channel: {}".format(
-                channel.username))
-        self.logger.info("FINISHED_CHANNEL:{}".format(channel.username))
-
-    def read_messages_from_dist(self, username):
-        ''' reads json messages saved to disk
-            Input: channel name
-            Output: json with its messages
-        '''
-        with open(self.messages_folder + username + ".json", "r") as inputfile:
-            messages = json.load(inputfile)
-        return messages
-
     def save_to_json(
-            self, obj: [TLObject, TotalList], label: str, channel_id: int):
+            self, obj: Union[TLObject, TotalList],
+            label: str, channel_id: int):
         """ dump TLObject inheritor to file
 
         params:
             - label: {"full", "linked_chat", "media", "messages", "replies"}
         """
         assert isinstance(channel_id, int), "channel_id must be integer"
-        # assert "to_json" in dir(
-        #     obj), "cannot dump object, it doesn't have .to_json"
         if not os.path.exists(self.dump_path):
             os.mkdir(self.dump_path)
 
@@ -430,7 +350,7 @@ class Crawler():
                 new_obj = [msg.to_dict() for msg in obj]
                 json.dump(
                     new_obj, fp, default=self.json_serial, ensure_ascii=False)
-            
+
             elif label == "replies":
                 new_obj = [msg.to_dict() for msg in obj]
                 # with open(filepath) as fp:
@@ -439,13 +359,19 @@ class Crawler():
                 # need to pass meddage_id into this function
             else:
                 raise ValueError("label '{}' unsupported")
-        self.logger.info("{} dumped in {}".format(label.capitalize(), filepath))
+        self.logger.info(
+            "{} dumped in {}".format(label.capitalize(), filepath))
 
     def is_channel(self, link: str) -> Tuple[bool, Union[None, int]]:
-        """ check if link is channel link and return indicator and channel_id """
-        entity = self.client.get_input_entity(link).to_dict()
-        if entity["_"] == "InputPeerChannel":
-            return True, entity["channel_id"]
+        """ check if link is channel link; return indicator and channel_id """
+        try:
+            entity = self.client.get_input_entity(link)
+            if isinstance(entity, InputPeerChannel):
+                return True, entity.channel_id
+        except ValueError as e:
+            self.logger.info(repr(e))
+        except Exception as e:
+            self.logger.error(repr(e))
         return False, None
 
     def notify(self, message: str, user: str):
@@ -455,7 +381,6 @@ class Crawler():
     @staticmethod
     def json_serial(obj):
         """JSON serializer for objects not serializable by default json code"""
-
         if isinstance(obj, (datetime, date)):
             return obj.isoformat()
         if isinstance(obj, bytes):
@@ -463,8 +388,9 @@ class Crawler():
         raise TypeError("Type %s not serializable" % type(obj))
 
     def get_request_delay(self):
-        ''' we need to set up a delay between requests, it must be a random number '''
-        delay_time = np.random.randint(low=self.min_delay, high=self.max_delay)
+        ''' we need to set up a delay between requests,
+        it must be a random number '''
+        delay_time = random.randint(self.min_delay, self.max_delay)
         return delay_time
 
     def wait(self, delay: int = None, to_log=True):
@@ -472,53 +398,3 @@ class Crawler():
         if to_log:
             self.logger.info('Going to sleep for {} sec'.format(str(delay)))
         sleep(delay)
-
-    # def get_already_parsed(self):
-    #     ''' reads the list of files in self.messages_folder, caches it and returns saved list '''
-    #     if self.already_parsed_channels is None:
-    #         self.already_parsed_channels = self.__find_already_parsed()
-    #     return self.already_parsed_channels
-
-    # def __find_already_parsed(self):
-    #     ''' internal: finds json files already filled in self.messages_folder '''
-    #     from_messages_folder = list(map(lambda filename: filename.replace(
-    #         ".json", "").lower(), os.listdir(self.messages_folder)))
-    #     from_config = get_channel_records_from_folder(self.already_parsed_path)
-    #     all_parsed = from_messages_folder + from_config
-    #     return all_parsed
-
-    # def get_non_existing(self):
-    #     ''' it loads usernames already determined to be non existant + reads the logs to find non-existant and updated the file '''
-    #     # we read the accounts we already know to be non existing
-    #     already_found = set(
-    #         get_channel_records_from_folder(
-    #             self.non_existing_accounts_folder))
-    #     # we check if we found some new non existing accounts in the log
-    #     log_data = []
-    #     for log_file in os.listdir(self.log_folder):
-    #         log_path = self.log_folder + "/" + log_file
-    #         with open(log_path, "r") as log_file:
-    #             log_data += log_file.read().splitlines()
-
-    #     for line in log_data:
-    #         m = re.search("DOES_NOT_EXIST:(?P<account>[A-Za-z0-9_-]+)", line)
-    #         if m:
-    #             new_account = m.group("account")
-
-    #     return already_found
-
-    # def write_final_stats(self, successful, start_time):
-    #     self.logger.info("stats")
-    #     self.logger.info("successful calls:{}".format(str(successful)))
-    #     spent_time = time() - start_time
-    #     self.logger.info("time spent in seconds:{}".format(str(spent_time)))
-    #     self.logger.info("***END***")
-
-    # def create_temporal_dataset(self, inputpath, outpath):
-    #     ''' creates a temporal dataset of only records that are still not parsed '''
-    #     df = pd.read_csv(inputpath, sep=";")
-    #     urls = df['Короткий URL'].apply(
-    #         lambda x: x.replace("@", "")).str.lower()
-    #     out_df = df[~(urls.isin(self.already_parsed) | urls.isin(
-    #         self.non_existing)) & (df['Тип (Группа/Канал)'] == "канал")]
-    #     out_df.to_csv(outpath, sep=";")
