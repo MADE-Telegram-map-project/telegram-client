@@ -2,3 +2,5 @@ Telethon~=1.23.0
 tqdm~=4.62.3
 omegaconf~=2.1
 python-statemachine~=0.8.0
+SQLAlchemy~=1.4.26
+pika~=1.2.0

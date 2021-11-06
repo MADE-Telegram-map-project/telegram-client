@@ -1,8 +1,11 @@
 from time import sleep
+import queue
+from omegaconf import OmegaConf
 
 from core.crawler import Crawler
+from core.entities import AppConfig
 from core.utils.link_extractor import extract_usernames
-
+from core.consumer import Consumer
 
 
 def run_crawler():
@@ -26,9 +29,10 @@ def run_crawler():
         max_value = int(sys.argv[3])
 
     if profile != "interactive":
-        log_name = profile + "_" + str(datetime.now().month) + "_" + str(datetime.now().day) + "_" + str(datetime.now().hour)
-        crawler  = RutanCrawler(profile,log_name)
-        data     = Preprocessor().get_new_ids()
+        log_name = profile + "_" + str(datetime.now().month) + "_" + str(
+            datetime.now().day) + "_" + str(datetime.now().hour)
+        crawler = RutanCrawler(profile, log_name)
+        data = Preprocessor().get_new_ids()
     #   data = Preprocessor().get_clean_downloaded_dataset_with_7k_records("data/tmp_dataset.csv")
     #   urls = data['Короткий URL'].iloc[min_value:max_value]
         urls = data.iloc[min_value:max_value]
@@ -40,12 +44,18 @@ def run_crawler():
     return locals()
 
 
-
-
-def main():
+def main(config: AppConfig):
     # ch = 1149710531  # latina
     # mid = 2581
     ch = "gagaga_momomo"
+
+    maxsize = 1
+    input_queue = queue.Queue(maxsize=maxsize)
+    output_queue = queue.Queue(maxsize=maxsize)
+
+    # Other thread can receive message from output_queue and add processign result to input_queue
+    consumer = Consumer(config.message_broker, input_queue, output_queue)
+    consumer.start_consuming()
 
     crawler = Crawler()
     crawler.crawl()
@@ -62,14 +72,14 @@ def main():
     #     ch, full.linked_chat_id)
     # crawler.save_to_json(lch_members_raw, "linked_chat", ch)
     # sleep(2)
-    
+
     # n_messages = 10
     # messages, messages_raw = crawler.get_messages(ch, n_messages)
 
     # nei_usernames = extract_usernames(full.about, messages_raw)
 
-    # crawler.save_to_json(messages_raw, "messages", ch)    
-    
+    # crawler.save_to_json(messages_raw, "messages", ch)
+
     # print(messages)
     # sleep(2)
 
@@ -79,9 +89,13 @@ def main():
     #         sleep(1)
 
 
-
 if __name__ == "__main__":
-    main()
+    config_path = "configs/client_config.yml"
+    base_config = OmegaConf.load(config_path)
+    schema = OmegaConf.structured(AppConfig)
+    config = OmegaConf.merge(schema, base_config)
+    config: AppConfig = OmegaConf.to_object(config)
+    main(config)
 
 
 # if __name__ =="__main__":
