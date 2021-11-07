@@ -13,13 +13,13 @@ from telethon import types
 from telethon.errors import MsgIdInvalidError
 from telethon.helpers import TotalList
 from telethon.sync import TelegramClient
-from telethon.tl.functions.channels import GetFullChannelRequest
+from telethon.tl.functions.channels import GetFullChannelRequest, JoinChannelRequest
 from telethon.tl.functions.messages import (GetRepliesRequest,
                                             GetSearchCountersRequest)
 from telethon.tl.types import InputPeerChannel, PeerChannel, TLObject
 from telethon.tl.types.messages import ChannelMessages, ChatFull, SearchCounter
 
-from core.entities import (ClientConfigSchema, FullChannelData,
+from core.entities import (AppConfig, FullChannelData,
                            MediaChannelData, MessageData, ReplyData, UserData)
 from core.utils import (cool_exceptor, extract_usernames, is_processed,
                         load_channel, mark_as_error, mark_as_ok,
@@ -52,7 +52,7 @@ class Crawler():
             config_path="configs/client_config.yml",
             logging_config_path="configs/logger_config.yml",
             dump_path="data/raw",
-            activate_logging=False,
+            activate_logging=True,
     ):
         '''
         reads config values, creates logger and
@@ -65,22 +65,24 @@ class Crawler():
         self.client = self.__authorize()
         self.logger = logging.getLogger("client")
         self.dump_path = dump_path
+        self.successful = 0
+        self.chat_member = False
         self.activate_logging = activate_logging
         if activate_logging:
             self.__init_logging()
 
-    def __load_config(self) -> ClientConfigSchema:
+    def __load_config(self) -> AppConfig:
         base_config = OmegaConf.load(self.config_path)
-        schema = OmegaConf.structured(ClientConfigSchema)
+        schema = OmegaConf.structured(AppConfig)
         config = OmegaConf.merge(schema, base_config)
-        config: ClientConfigSchema = OmegaConf.to_object(config)
+        config: AppConfig = OmegaConf.to_object(config)
         return config
 
     def __authorize(self):
         client = TelegramClient(
-            self.config.session,
-            self.config.api_id,
-            self.config.api_hash,
+            self.config.client_config.session,
+            self.config.client_config.api_id,
+            self.config.client_config.api_hash,
         )
         client.connect()
         if client.is_user_authorized():
@@ -96,28 +98,27 @@ class Crawler():
         # let's go
         self.logger.debug("*** New run ***")
 
-    def crawl(self):
+    def end_parsing(self):
+        stop_message = "Crawling done, successful calls: {}".format(self.successful)
+        self.logger.info(stop_message)
+        self.notify(stop_message, "kpotoh")
+
+    def crawl_channel(self, username: Union[int, str]):
         ''' that is the main method responsible for the parse of the messages
             TODO: complete the description
         '''
+        start_time = time()
         if not self.activate_logging:
             self.__init_logging()
-        successful = 3  # TODO replace by 0
-        while True:
-            username = load_channel(successful)
-            start_time = time()
+
+        try:
             if username is None:
-                stop_message = "Crawling done, successful calls: {}"\
-                    .format(successful)
-                self.logger.info(stop_message)
-                self.notify(stop_message, "kpotoh")
-                break
+                return "end"
 
-            if is_processed(username):
-                self.logger.info('Already parsed {}'.format(username))
-                continue
+            # if is_processed(username):
+            #     self.logger.info('Already parsed {}'.format(username))
+            #     return "error"
 
-            mark_as_processing(username)
             self.logger.info("Started iteration for {}".format(username))
 
             ########## FULL ##########
@@ -127,7 +128,7 @@ class Crawler():
                 self.logger.info("Cannot get channel full; go to next chanel")
                 mark_as_error(username)
                 self.wait()
-                continue
+                return "error"
             else:
                 full_data, full_data_raw = full_data
                 channel_id = full_data.channel_id
@@ -143,7 +144,7 @@ class Crawler():
             if _pc < self.min_participants_count:
                 self.logger.info(
                     'Small channel, {} participants, pass it'.format(_pc))
-                continue
+                return "small"
 
             ########## MEDIA ##########
             self.logger.info('Run channel media counts extraction')
@@ -201,11 +202,16 @@ class Crawler():
                              .format(len(new_channels)))
 
             mark_as_ok(username)
-            successful += 1
+            self.successful += 1
             spent_time = time() - start_time
             self.logger.info("Channel {} done in {:.2f} seconds".format(
                 channel_id, spent_time))
             self.wait()
+            return 'ok'
+
+        except Exception as e:
+            self.logger.critical(repr(e))
+            return 'error'
 
     @cool_exceptor
     def get_channel_full(
@@ -380,9 +386,15 @@ class Crawler():
             self.logger.error(repr(e))
         return False, None
 
-    def notify(self, message: str, user: str):
-        """ send `message` (notification) to @user """
-        self.client.send_message(user, message)
+    def notify(self, message: str, chat=1777596799):
+        """ send `message` (notification) to chat """
+        if not self.chat_member:
+            self.chat_member = True
+            self.client(JoinChannelRequest(chat))
+            self.logger.info("Joined to chat")
+
+        self.client.send_message(chat, message)
+        self.logger.info("Sended message '{}' to chat".format(message))
 
     @staticmethod
     def json_serial(obj):

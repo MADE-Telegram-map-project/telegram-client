@@ -4,3 +4,7 @@ omegaconf~=2.1
 python-statemachine~=0.8.0
 SQLAlchemy~=1.4.26
 pika~=1.2.0
+psycopg2~=2.9
+SQLAlchemy~=1.4.26
+tzlocal
+pyaml

@@ -7,3 +7,4 @@ telegram_client.egg-info
 logs/crawler_runs.log
 data/raw/
 check_env
+.env

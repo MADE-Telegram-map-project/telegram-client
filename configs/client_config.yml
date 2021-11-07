@@ -6,7 +6,7 @@ client_config:
   phone: ${oc.env:PHONE}
 
 message_broker:
-  input_queue: ${oc.env:RABBIT_MQ_INPUT_SCHEMA}
+  input_queue: ${oc.env:RABBIT_MQ_INPUT_QUEUE}
   user: ${oc.env:RABBIT_MQ_USER}
   passwd: ${oc.env:RABBIT_MQ_PASS}
   host: ${oc.env:RABBIT_MQ_HOST,localhost}

@@ -18,7 +18,8 @@ class Consumer:
         credentials = pika.PlainCredentials(
             config.user, config.passwd, erase_on_connect=True)
         self._connection_params = pika.ConnectionParameters(
-            host=config.host, port=config.port, credentials=credentials, heartbeat=config.heartbeat)
+            host=config.host, port=config.port, 
+            credentials=credentials, heartbeat=config.heartbeat)
 
         self._config = config
         self._connection = None
@@ -53,8 +54,10 @@ class Consumer:
         while True:
             try:
                 result: ProcessingResult = self._input_queue.get_nowait()
+                print(result)
             except queue.Empty:
                 self._connection.sleep(self._config.sleep_timeout_in_sec)
+                print("gagaga")
             else:
                 break
 
@@ -83,9 +86,11 @@ class Consumer:
 
                 if result.status == ProcessingStatus.SUCCESS:
                     self._process_success(result, method_frame)
+                
                 else:
                     self._process_fail(
-                        result, method_frame, requeue=result.status == ProcessingStatus.FAIL_NEED_REQUEUE)
+                        result, method_frame, 
+                            requeue = result.status == ProcessingStatus.FAIL_NEED_REQUEUE)
         except Exception:
             self._logger.exception(
                 "Unexpected runtime error. Shutdown consumer")
