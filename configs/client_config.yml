@@ -1,4 +1,21 @@
-session: ${oc.env:SESSION}
-api_id: ${oc.env:API_ID}
-api_hash: ${oc.env:API_HASH}
-phone: ${oc.env:PHONE}
+
+client_config:
+  session: ${oc.env:SESSION}
+  api_id: ${oc.env:API_ID}
+  api_hash: ${oc.env:API_HASH}
+  phone: ${oc.env:PHONE}
+
+message_broker:
+  input_queue: ${oc.env:RABBIT_MQ_INPUT_SCHEMA}
+  user: ${oc.env:RABBIT_MQ_USER}
+  passwd: ${oc.env:RABBIT_MQ_PASS}
+  host: ${oc.env:RABBIT_MQ_HOST,localhost}
+  port: ${oc.env:RABBIT_MQ_PORT,5432}
+  sleep_timeout_in_sec: 5
+
+database:
+  user: ${oc.env:POSTGRES_USER}
+  passw: ${oc.env:POSTGRES_PASS}
+  host: ${oc.env:POSTGRES_HOST}
+  port: ${oc.env:POSTGRES_PORT,5432}
+  db_url: postgresql+psycopg2://${.user}:${.passw}@${.host}:${.port}/${.user}
