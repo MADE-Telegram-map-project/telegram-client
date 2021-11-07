@@ -1,0 +1,12 @@
+root = true
+
+[*{.md,.txt,.py}]
+charset = utf-8
+indent_style = space
+trim_trailing_whitespace = true
+
+[*.py]
+insert_final_newline = true
+
+[*.sh]
+end_of_line = lf
