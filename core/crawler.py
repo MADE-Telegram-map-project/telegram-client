@@ -1,3 +1,4 @@
+import getpass
 import json
 import logging
 import logging.config
@@ -10,7 +11,7 @@ from typing import List, Tuple, Union
 import yaml
 from omegaconf import OmegaConf
 from telethon import types
-from telethon.errors import MsgIdInvalidError
+from telethon.errors import MsgIdInvalidError, SessionPasswordNeededError
 from telethon.helpers import TotalList
 from telethon.sync import TelegramClient
 from telethon.tl.functions.channels import GetFullChannelRequest, JoinChannelRequest
@@ -59,17 +60,18 @@ class Crawler():
         authorizes the client if necessary
         '''
 
+        self.logging_config_path = logging_config_path
+        self.logger = logging.getLogger("client")
+        if activate_logging:
+            self.__init_logging()
+
         self.config_path = config_path
         self.config = self.__load_config()
-        self.logging_config_path = logging_config_path
         self.client = self.__authorize()
-        self.logger = logging.getLogger("client")
         self.dump_path = dump_path
         self.successful = 0
         self.chat_member = False
         self.activate_logging = activate_logging
-        if activate_logging:
-            self.__init_logging()
 
     def __load_config(self) -> AppConfig:
         base_config = OmegaConf.load(self.config_path)
@@ -85,11 +87,17 @@ class Crawler():
             self.config.client_config.api_hash,
         )
         client.connect()
+
         if client.is_user_authorized():
             return client
-        else:
-            self.logger.critical("Not authorized")
-            raise Exception("Not authorized")
+        
+        client.sign_in(self.config.client_config.phone)
+        try:
+            client.sign_in(code=input('Enter code: '))
+        except SessionPasswordNeededError:
+            client.sign_in(password=getpass.getpass())
+        self.logger.info("Authorized")
+        return client
 
     def __init_logging(self):
         with open(self.logging_config_path) as config_fin:
@@ -386,7 +394,7 @@ class Crawler():
             self.logger.error(repr(e))
         return False, None
 
-    def notify(self, message: str, chat=1777596799):
+    def notify(self, message: str, chat="telemap_ctitical"):
         """ send `message` (notification) to chat """
         if not self.chat_member:
             self.chat_member = True

@@ -1,4 +1,4 @@
-client1.session
+*.session
 client1.session-journal
 .vscode
 env*
@@ -8,3 +8,4 @@ logs/crawler_runs.log
 data/raw/
 check_env
 .env
+accounts.yml

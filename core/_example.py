@@ -7,22 +7,23 @@ from telethon.sync import TelegramClient
 
 
 # # api_hash from https://my.telegram.org, under API Development.
-api_id: int = os.environ["API_ID"]
-api_hash: str = os.environ["API_HASH"]
-
-name = 'client1'
+api_id: int = 19926971
+api_hash: str = "b79bb982b4b674ccebe2013153a06c7d"
+name = 'client3'
 
 ch = "latinapopacanski"
 # ch = "weirdreparametrizationtrick"
 # ch = "bdscience_ru"
-ch = 1232476793
+ch = 1149710531
 client: TelegramClient = None
 
 with TelegramClient(name, api_id, api_hash) as client:
+    print("here")
     full = client(functions.channels.GetFullChannelRequest(
         channel=ch
     ))
-    # print(full.stringify())
+    print(full.stringify())
+    client.get_entity
 
     # participants = client.get_participants(channel_username)
     # print()
@@ -30,32 +31,32 @@ with TelegramClient(name, api_id, api_hash) as client:
     # client.get_messages(entity)
     # client.iter_messages(entity)
 
-    channel_peer = client.get_peer_id(ch)
+    # channel_peer = client.get_peer_id(ch)
 
 
-    for i, message in enumerate(client.iter_messages(ch)):
+    # for i, message in enumerate(client.iter_messages(ch)):
         
-        # if it's possible TODO
-        if True:
-            comments = client(
-                functions.messages.GetRepliesRequest(
-                    peer=channel_peer, 
-                    msg_id=message.id, 
-                    offset_id=0, 
-                    offset_date=None, 
-                    add_offset=0,
-                    limit=0,
-                    max_id=0,
-                    min_id=0,
-                    hash=0,
-                )
-            )
-            commenters = [(x.id, x.username) for x in comments.users]
+    #     # if it's possible TODO
+    #     if True:
+    #         comments = client(
+    #             functions.messages.GetRepliesRequest(
+    #                 peer=channel_peer, 
+    #                 msg_id=message.id, 
+    #                 offset_id=0, 
+    #                 offset_date=None, 
+    #                 add_offset=0,
+    #                 limit=0,
+    #                 max_id=0,
+    #                 min_id=0,
+    #                 hash=0,
+    #             )
+    #         )
+    #         commenters = [(x.id, x.username) for x in comments.users]
 
-        print(message.stringify())
+        # print(message.stringify())
         
-        if i == 0:
-            break
+        # if i == 0:
+        #     break
 
     # res2 = functions.channels.GetMessagesRequest(channel=ch, id=None)
     # functions.channels.GetParticipantsRequest(channel, filter, offset, limit, hash)

@@ -58,7 +58,8 @@ def main(config: AppConfig):
     # consumer.start_consuming()
 
     crawler = Crawler()
-    crawler.notify("test")
+    print(crawler.config)
+    # crawler.notify("test client 2")
     # crawler.crawl()
 
     # crawler.is_channel(ch)
