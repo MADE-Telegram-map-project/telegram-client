@@ -93,8 +93,8 @@ def save_messages(messages: List[MessageData], session_cls: Session):
                     views=msg.views,
                     forwards=msg.forwards,
                     replies_cnt=msg.replies_cnt,
-                    fwd_from_channel_id=msg.fwd_from_channel_id,
-                    fwd_from_message_id=msg.fwd_from_message_id,
+                    fwd_from_channel_id=msg.fwd_channel_id,
+                    fwd_from_message_id=msg.fwd_message_id,
                 ))
                 session.commit()
     return

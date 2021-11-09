@@ -156,7 +156,6 @@ class Crawler():
                     "Got channel full - username: {}, id: {}".format(
                         full_data.username, channel_id))
                 self.save_to_json(full_data_raw, "full", channel_id)
-                self.logger.info("Full saved to drive")
 
             self.wait()
             _pc = full_data.participants_count
@@ -176,7 +175,6 @@ class Crawler():
                 self.logger.info("Media counts extracted")
                 media_data, media_data_raw = media_data
                 self.save_to_json(media_data_raw, "media", channel_id)
-                self.logger.info("Media saved to drive")
             
             save_header(full_data, media_data, self.db_session_cls)
             self.logger.info("Header saved to db")
@@ -199,7 +197,7 @@ class Crawler():
                     self.save_to_json(
                         chat_users_raw, "linked_chat", channel_id)
                     save_users(chat_users, self.db_session_cls)
-                    self.logger.info("Linked chat users saved to db and drive")
+                    self.logger.info("Linked chat users saved to db")
             else:
                 self.logger.info("There are no linked chat")
 
