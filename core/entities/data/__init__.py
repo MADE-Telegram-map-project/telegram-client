@@ -1,8 +1,10 @@
-from .datas import FullChannelData, MediaChannelData, MessageData, UserData
+from .datas import FullChannelData, MediaChannelData, MessageData, UserData, ChannelRelationData
 
 __all__ = [
     "FullChannelData", 
     "MediaChannelData", 
     "MessageData", 
-    "UserData"    
+    "UserData",
+    "ChannelRelationData",
+    "ReplyData",
 ]

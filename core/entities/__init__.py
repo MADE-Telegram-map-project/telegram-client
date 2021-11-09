@@ -4,7 +4,8 @@ from .data.datas import (
     MediaChannelData,
     MessageData,
     UserData,
-    ReplyData
+    ReplyData,
+    ChannelRelationData,
 )
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "UserData",
     "ReplyData",
     "MessageBrokerConfigSchema",
-    "AppConfig"
+    "AppConfig",
+    "ChannelRelationData"
 ]

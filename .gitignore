@@ -9,3 +9,5 @@ data/raw/
 check_env
 .env
 accounts.yml
+dist
+build

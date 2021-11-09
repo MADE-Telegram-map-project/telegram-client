@@ -7,6 +7,13 @@ from core.entities import AppConfig
 from core.utils.link_extractor import extract_usernames
 from core.consumer import Consumer
 
+from core.utils import (
+    save_header,
+    save_users,
+    save_messages,
+    save_replies,
+    save_usernames
+)
 
 def run_crawler():
     profiles = ["megafon", "base", "interactive"]
@@ -45,9 +52,9 @@ def run_crawler():
 
 
 def main(config: AppConfig):
-    # ch = 1149710531  # latina
+    ch = 1149710531  # latina
     # mid = 2581
-    ch = "gagaga_momomo"
+    # ch = "gagaga_momomo"
 
     # maxsize = 1
     # input_queue = queue.Queue(maxsize=maxsize)
@@ -58,32 +65,34 @@ def main(config: AppConfig):
     # consumer.start_consuming()
 
     crawler = Crawler()
-    print(crawler.config)
-    # crawler.notify("test client 2")
+    # print(crawler.config)
+    # crawler.notify("test client 1")
     # crawler.crawl()
 
-    # crawler.is_channel(ch)
+    # print(crawler.is_channel(ch))
 
-    # full, full_raw = crawler.get_channel_full(ch)
+    full, full_raw = crawler.get_channel_full(ch)
     # crawler.save_to_json(full_raw, "full", ch)
-    # sleep(2)
-    # media, media_raw = crawler.get_header_media_counts(ch)
+    sleep(2)
+    media, media_raw = crawler.get_header_media_counts(ch)
     # crawler.save_to_json(media_raw, "media", ch)
-    # sleep(2)
-    # lch_members, lch_members_raw = crawler.get_linked_chat_members(
-    #     ch, full.linked_chat_id)
+
+    save_header(full, media, crawler.config)
+    sleep(2)
+    lch_members, lch_members_raw = crawler.get_linked_chat_members(
+        ch, full.linked_chat_id)
     # crawler.save_to_json(lch_members_raw, "linked_chat", ch)
-    # sleep(2)
+    sleep(2)
 
-    # n_messages = 10
-    # messages, messages_raw = crawler.get_messages(ch, n_messages)
+    n_messages = 10
+    messages, messages_raw = crawler.get_messages(ch, n_messages)
 
-    # nei_usernames = extract_usernames(full.about, messages_raw)
+    nei_usernames = extract_usernames(full.about, messages_raw)
 
     # crawler.save_to_json(messages_raw, "messages", ch)
 
     # print(messages)
-    # sleep(2)
+    sleep(2)
 
     # for msg in messages:
     #     if msg.replies_cnt > 0:

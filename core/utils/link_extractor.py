@@ -1,5 +1,5 @@
 import re
-from typing import List, Set, Union
+from typing import List, Set, Tuple, Union
 
 from telethon.helpers import TotalList
 from telethon.tl.patched import Message
@@ -107,13 +107,15 @@ def extract_usernames_from_media(msg: Message) -> List[str]:
     return usernames
 
 
-def extract_usernames(channel_about: str, messages: TotalList) -> Set[str]:
+def extract_usernames(
+    channel_about: str, messages: TotalList) -> Tuple[Set[str], Set[int]]:
     """ main func to release all neighbour channels """
     usernames = set(extract_usernames_from_text(channel_about))
+    ids = set()
     for msg in messages:
         fwd_channel = extract_fwd_channel(msg)
         if fwd_channel is not None:
-            usernames.add(fwd_channel)
+            ids.add(fwd_channel)
 
         ent_usernames = extract_usernames_from_entities(msg)
         med_usernames = extract_usernames_from_media(msg)
@@ -123,7 +125,7 @@ def extract_usernames(channel_about: str, messages: TotalList) -> Set[str]:
         for uname in med_usernames:
             usernames.add(uname)
 
-    return usernames
+    return usernames, ids
 
 
 if __name__ == "__main__":

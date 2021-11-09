@@ -4,6 +4,7 @@ import logging
 import logging.config
 import os
 import random
+from queue import Queue
 from datetime import date, datetime
 from time import sleep, time
 from typing import List, Tuple, Union
@@ -23,8 +24,15 @@ from telethon.tl.types.messages import ChannelMessages, ChatFull, SearchCounter
 from core.entities import (AppConfig, FullChannelData,
                            MediaChannelData, MessageData, ReplyData, UserData)
 from core.utils import (cool_exceptor, extract_usernames, is_processed,
-                        load_channel, mark_as_error, mark_as_ok,
+                        mark_as_error, mark_as_ok,
                         mark_as_processing)
+from core.utils import (
+    save_header,
+    save_users,
+    save_messages,
+    save_replies,
+    save_usernames
+)
 
 
 class Crawler():
@@ -72,6 +80,7 @@ class Crawler():
         self.successful = 0
         self.chat_member = False
         self.activate_logging = activate_logging
+        self.queue = Queue()
 
     def __load_config(self) -> AppConfig:
         base_config = OmegaConf.load(self.config_path)
@@ -205,9 +214,16 @@ class Crawler():
             ########## NEW CHANNELS ##########
             self.logger.info(
                 "Start extraction of new usernames from messages and about")
-            new_channels = extract_usernames(full_data.about, messages_raw)
-            self.logger.info("Extracted {} new potential channels"
-                             .format(len(new_channels)))
+            new_usernames, new_ids = extract_usernames(full_data.about, messages_raw)
+            self.logger.info("Extracted {} new potential usernames"
+                             .format(len(new_usernames)))
+            self.logger.info("Extracted {} new channel ids".format(len(new_ids)))
+            for nid in new_ids:
+                self.queue.put(nid)
+                self.logger.info("Add {} to inner queue".format(nid))
+            for nuname in new_usernames:
+                pass
+                # self.logger.info("Add {} to DB queue".format(nuname))
 
             mark_as_ok(username)
             self.successful += 1

@@ -1,5 +1,4 @@
 import datetime
-# from collections import namedtuple
 from dataclasses import dataclass
 from typing import Union
 
@@ -52,6 +51,7 @@ class MessageData:
 
 @dataclass
 class ReplyData:
+    id: int
     message_id: int
     channel_id: int
     message: str
@@ -59,26 +59,8 @@ class ReplyData:
     user_id: int
 
 
-# FullChannelData = namedtuple(
-#     "FullChannelData",
-#     ("channel_id", "title", "link", "about", "date", "participants_count")
-# )
-
-# MediaChannelData = namedtuple(
-#     "MediaChannelData",
-#     ("photo", "video", "document", "music", "url", "voice", "gif")
-# )
-# UserData = namedtuple("UserData", ("user_id", "bot", "username"))
-# MessageData = namedtuple(
-#     "MessageData", (
-#         "message_id",
-#         "text",
-#         "date",
-#         "views",
-#         "forwards",
-#         "replies_cnt",
-#         "fwd_channel_id",
-#         "fwd_message_id",
-#         "replies",
-#     )
-# )
+@dataclass
+class ChannelRelationData:
+    from_channel_id: int
+    to_channel_link: Union[str, None] = None
+    to_channel_id: Union[int, None] = None

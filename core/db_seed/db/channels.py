@@ -9,7 +9,7 @@ class Channels(Base):
     __tablename__ = "Channels"
 
     channel_id = Column("channel_id", BigInteger, primary_key=True)
-    title = Column("text", Text, nullable=False)
+    title = Column("title", Text, nullable=False)
     link = Column("link", Text, nullable=False)
     about = Column("about", Text, nullable=False)
     date = Column("date", DateTime(timezone=True), nullable=False)
