@@ -12,9 +12,8 @@ import logging
 
 from psycopg2 import sql
 from omegaconf import OmegaConf
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import create_engine
-# from sqlalchemy.sql.functions import user
 
 from core.entities import (
     FullChannelData, MediaChannelData, ChannelRelationData,
@@ -24,6 +23,7 @@ from core.db_seed.db import (
     ChannelQueue, Channels, Messages, UserChannel, ChannelRelation, Replies
 )
 
+
 def _load_channel(idx: int) -> Union[int, str]:
     """ load channel from queue """
     my_channels = [
@@ -32,11 +32,9 @@ def _load_channel(idx: int) -> Union[int, str]:
 
 
 def save_header(
-        full_data: FullChannelData, media: MediaChannelData, config: AppConfig):
+        full_data: FullChannelData, media: MediaChannelData, session_cls: Session):
     """ add channel header (full + media) to db """
-    engine = create_engine(config.database.db_url)
-    Session = sessionmaker(bind=engine)
-    with Session() as session:
+    with session_cls() as session:
         record = session.query(Channels).filter(
             Channels.channel_id == full_data.channel_id).first()
         if record is None:
@@ -59,11 +57,9 @@ def save_header(
     return
 
 
-def save_users(users: List[UserData], config: AppConfig):
+def save_users(users: List[UserData], session_cls: Session):
     """ add new user-channel links to db """
-    engine = create_engine(config.database.db_url)
-    Session = sessionmaker(bind=engine)
-    with Session() as session:
+    with session_cls() as session:
         for user in users:
             record = session.query(UserChannel).filter(
                 UserChannel.user_id == user.user_id,
@@ -77,13 +73,12 @@ def save_users(users: List[UserData], config: AppConfig):
                     username=user.username,
                 ))
                 session.commit()
+    return
 
 
-def save_messages(messages: List[MessageData], config: AppConfig):
+def save_messages(messages: List[MessageData], session_cls: Session):
     """ add channel messages to db """
-    engine = create_engine(config.database.db_url)
-    Session = sessionmaker(bind=engine)
-    with Session() as session:
+    with session_cls() as session:
         for msg in messages:
             record = session.query(Messages).filter(
                 Messages.message_id == msg.message_id,
@@ -102,18 +97,17 @@ def save_messages(messages: List[MessageData], config: AppConfig):
                     fwd_from_message_id=msg.fwd_from_message_id,
                 ))
                 session.commit()
-                
+    return
 
-def save_replies(replies: list[ReplyData], config: AppConfig):
+
+def save_replies(replies: list[ReplyData], session_cls: Session):
     """ add message replies to db """
-    engine = create_engine(config.database.db_url)
-    Session = sessionmaker(bind=engine)
-    with Session() as session:
+    with session_cls() as session:
         for rlp in replies:
             record = session.query(Replies).filter(
+                    Replies.id == rlp.id,
                     Replies.message_id == rlp.message_id,
                     Replies.channel_id == rlp.channel_id,
-                    Replies.message == rlp.message,
                 ).first()
             if record is None:
                 session.add(Replies(
@@ -125,13 +119,12 @@ def save_replies(replies: list[ReplyData], config: AppConfig):
                     user_id=rlp.user_id,
                 ))
                 session.commit()
+    return
 
 
-def save_usernames(relations: list[ChannelRelationData], config: AppConfig):
+def save_relations(relations: list[ChannelRelationData], session_cls: Session):
     """ add channel usernames to queue & add pair of connected channels to db """
-    engine = create_engine(config.database.db_url)
-    Session = sessionmaker(bind=engine)
-    with Session() as session:
+    with session_cls() as session:
         for rel in relations:
             record = session.query(ChannelRelation).filter(
                     ChannelRelation.from_channel_id == rel.from_channel_id,
@@ -156,6 +149,7 @@ def save_usernames(relations: list[ChannelRelationData], config: AppConfig):
                 session.add(ChannelQueue(
                     channel_link=rel.to_channel_link, status="to_process"))
                 session.commit()
+    return
 
 
 if __name__ == "__main__":
@@ -167,30 +161,6 @@ if __name__ == "__main__":
     
 
 
-
-
-
-
-
-def is_processed(channel) -> bool:
-    """ check if channel marked as ok, processing or error in BD """
-    # TODO connection to DB
-    return False
-
-
-def mark_as_processing(channel: int):
-    """ send mark 'processing' for channel to DB """
-    pass
-
-
-def mark_as_error(channel):
-    """ send mark 'error' for channel to DB """
-    pass
-
-
-def mark_as_ok(channel):
-    """ send mark 'ok' for channel to DB """
-    pass 
 
 
 

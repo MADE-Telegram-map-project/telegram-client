@@ -12,7 +12,7 @@ from core.utils import (
     save_users,
     save_messages,
     save_replies,
-    save_usernames
+    save_relations
 )
 
 def run_crawler():
@@ -67,32 +67,32 @@ def main(config: AppConfig):
     crawler = Crawler()
     # print(crawler.config)
     # crawler.notify("test client 1")
-    # crawler.crawl()
+    crawler.crawl_channel(ch)
 
     # print(crawler.is_channel(ch))
 
-    full, full_raw = crawler.get_channel_full(ch)
-    # crawler.save_to_json(full_raw, "full", ch)
-    sleep(2)
-    media, media_raw = crawler.get_header_media_counts(ch)
-    # crawler.save_to_json(media_raw, "media", ch)
+    # full, full_raw = crawler.get_channel_full(ch)
+    # # crawler.save_to_json(full_raw, "full", ch)
+    # sleep(2)
+    # media, media_raw = crawler.get_header_media_counts(ch)
+    # # crawler.save_to_json(media_raw, "media", ch)
 
-    save_header(full, media, crawler.config)
-    sleep(2)
-    lch_members, lch_members_raw = crawler.get_linked_chat_members(
-        ch, full.linked_chat_id)
-    # crawler.save_to_json(lch_members_raw, "linked_chat", ch)
-    sleep(2)
+    # save_header(full, media, crawler.db_session_cls)
+    # sleep(2)
+    # lch_members, lch_members_raw = crawler.get_linked_chat_members(
+    #     ch, full.linked_chat_id)
+    # # crawler.save_to_json(lch_members_raw, "linked_chat", ch)
+    # save_users(lch_members, crawler.db_session_cls)
+    # sleep(2)
 
-    n_messages = 10
-    messages, messages_raw = crawler.get_messages(ch, n_messages)
+    # n_messages = 10
+    # messages, messages_raw = crawler.get_messages(ch, n_messages)
+    # # crawler.save_to_json(messages_raw, "messages", ch)
 
-    nei_usernames = extract_usernames(full.about, messages_raw)
+    # save_messages(messages, crawler.db_session_cls)
+    # sleep(2)
 
-    # crawler.save_to_json(messages_raw, "messages", ch)
-
-    # print(messages)
-    sleep(2)
+    # nei_usernames = extract_usernames(full.about, messages_raw)
 
     # for msg in messages:
     #     if msg.replies_cnt > 0:

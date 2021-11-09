@@ -7,10 +7,12 @@ import random
 from queue import Queue
 from datetime import date, datetime
 from time import sleep, time
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Set
 
 import yaml
 from omegaconf import OmegaConf
+from sqlalchemy.orm import relation, sessionmaker, Session
+from sqlalchemy import create_engine
 from telethon import types
 from telethon.errors import MsgIdInvalidError, SessionPasswordNeededError
 from telethon.helpers import TotalList
@@ -21,17 +23,16 @@ from telethon.tl.functions.messages import (GetRepliesRequest,
 from telethon.tl.types import InputPeerChannel, PeerChannel, TLObject
 from telethon.tl.types.messages import ChannelMessages, ChatFull, SearchCounter
 
-from core.entities import (AppConfig, FullChannelData,
+from core.entities import (AppConfig, FullChannelData, ChannelRelationData,
                            MediaChannelData, MessageData, ReplyData, UserData)
-from core.utils import (cool_exceptor, extract_usernames, is_processed,
-                        mark_as_error, mark_as_ok,
-                        mark_as_processing)
 from core.utils import (
+    cool_exceptor, 
+    extract_usernames,
     save_header,
     save_users,
     save_messages,
     save_replies,
-    save_usernames
+    save_relations
 )
 
 
@@ -81,6 +82,8 @@ class Crawler():
         self.chat_member = False
         self.activate_logging = activate_logging
         self.queue = Queue()
+        engine = create_engine(self.config.database.db_url)
+        self.db_session_cls = sessionmaker(bind=engine)
 
     def __load_config(self) -> AppConfig:
         base_config = OmegaConf.load(self.config_path)
@@ -123,6 +126,7 @@ class Crawler():
     def crawl_channel(self, username: Union[int, str]):
         ''' that is the main method responsible for the parse of the messages
             TODO: complete the description
+            TODO add notify to critical errors
         '''
         start_time = time()
         if not self.activate_logging:
@@ -143,18 +147,16 @@ class Crawler():
             full_data = self.get_channel_full(username)
             if full_data is None:
                 self.logger.info("Cannot get channel full; go to next chanel")
-                mark_as_error(username)
                 self.wait()
                 return "error"
             else:
                 full_data, full_data_raw = full_data
                 channel_id = full_data.channel_id
-                # self.channel_id = channel_id
                 self.logger.info(
                     "Got channel full - username: {}, id: {}".format(
                         full_data.username, channel_id))
                 self.save_to_json(full_data_raw, "full", channel_id)
-                # TODO save full
+                self.logger.info("Full saved to drive")
 
             self.wait()
             _pc = full_data.participants_count
@@ -174,7 +176,10 @@ class Crawler():
                 self.logger.info("Media counts extracted")
                 media_data, media_data_raw = media_data
                 self.save_to_json(media_data_raw, "media", channel_id)
-                # TODO save media counts
+                self.logger.info("Media saved to drive")
+            
+            save_header(full_data, media_data, self.db_session_cls)
+            self.logger.info("Header saved to db")
 
             self.wait()
 
@@ -193,7 +198,8 @@ class Crawler():
                     chat_users, chat_users_raw = chat_users
                     self.save_to_json(
                         chat_users_raw, "linked_chat", channel_id)
-                    # TODO save chat users
+                    save_users(chat_users, self.db_session_cls)
+                    self.logger.info("Linked chat users saved to db and drive")
             else:
                 self.logger.info("There are no linked chat")
 
@@ -209,7 +215,8 @@ class Crawler():
                     len(messages[0])))
                 messages, messages_raw = messages
                 self.save_to_json(messages_raw, "messages", channel_id)
-                # TODO save messages
+                save_messages(messages, self.db_session_cls)
+                self.logger.info("Messages saved to db and drive")
 
             ########## NEW CHANNELS ##########
             self.logger.info(
@@ -218,14 +225,11 @@ class Crawler():
             self.logger.info("Extracted {} new potential usernames"
                              .format(len(new_usernames)))
             self.logger.info("Extracted {} new channel ids".format(len(new_ids)))
-            for nid in new_ids:
-                self.queue.put(nid)
-                self.logger.info("Add {} to inner queue".format(nid))
-            for nuname in new_usernames:
-                pass
-                # self.logger.info("Add {} to DB queue".format(nuname))
+            
+            relations = self.form_relation_data(channel_id, new_ids, new_usernames)
+            save_relations(relations, self.db_session_cls)
+            self.logger.info("Relations saved to db and usernames added to queue")
 
-            mark_as_ok(username)
             self.successful += 1
             spent_time = time() - start_time
             self.logger.info("Channel {} done in {:.2f} seconds".format(
@@ -440,3 +444,16 @@ class Crawler():
         if to_log:
             self.logger.info('Going to sleep for {} sec'.format(str(delay)))
         sleep(delay)
+
+    def form_relation_data(
+            self, channel_id: int, 
+            new_ids: Set[int], 
+            new_usernames: Set[str]) -> List[ChannelRelationData]:
+        """ form normal data view for relations """
+        relations = []
+        for nid in new_ids:
+            self.queue.put(nid)
+            relations.append(ChannelRelationData(channel_id, to_channel_id=nid))
+        for nuname in new_usernames:
+            relations.append(ChannelRelationData(channel_id, to_channel_link=nuname))
+        return relations
