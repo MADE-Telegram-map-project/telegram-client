@@ -1,12 +1,11 @@
 import queue
-from time import sleep
+import threading
 
 from omegaconf import OmegaConf
 
 from core.consumer import Consumer
 from core.crawler import Crawler
 from core.entities import AppConfig
-from core.utils.link_extractor import extract_usernames
 
 
 def main(config: AppConfig):
@@ -14,15 +13,16 @@ def main(config: AppConfig):
     input_queue = queue.Queue(maxsize=maxsize)
     output_queue = queue.Queue(maxsize=maxsize)
 
-    # # Other thread can receive message from output_queue and 
-    # # add processign result to input_queue
     consumer = Consumer(config.message_broker, input_queue, output_queue)
-    consumer.start_consuming()
-    print(consumer)
-    
-    crawler = Crawler()
-    crawler.crawl()
+    crawler = Crawler(config, input_queue, output_queue)
 
+    # # Other thread can receive message from output_queue and
+    # # add processign result to input_queue
+    t = threading.Thread(target=consumer.start_consuming)
+    t.start()
+
+    crawler.crawl()
+    t.join()
 
 
 if __name__ == "__main__":
@@ -31,5 +31,4 @@ if __name__ == "__main__":
     schema = OmegaConf.structured(AppConfig)
     config = OmegaConf.merge(schema, base_config)
     config: AppConfig = OmegaConf.to_object(config)
-    print(config)
     main(config)

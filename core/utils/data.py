@@ -23,6 +23,8 @@ from core.db_seed.db import (
     ChannelQueue, Channels, Messages, UserChannel, ChannelRelation, Replies
 )
 
+STATUSES = {'ok', 'error', 'processing', 'to_process'}
+
 
 def _load_channel(idx: int) -> Union[int, str]:
     """ load channel from queue """
@@ -150,6 +152,15 @@ def save_relations(relations: list[ChannelRelationData], session_cls: Session):
                     channel_link=rel.to_channel_link, status="to_process"))
                 session.commit()
     return
+
+
+def send_status_to_queue(username: str, status: str, session_cls: Session):
+    assert status in STATUSES, "such status {} is not allowable".format(status)
+    with session_cls() as session:
+        session.query(ChannelQueue)\
+                .filter(ChannelQueue.channel_link == username)\
+                .update({"status": status})
+        session.commit()
 
 
 if __name__ == "__main__":

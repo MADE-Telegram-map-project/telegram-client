@@ -6,6 +6,7 @@ from .data import (
     save_messages,
     save_replies,
     save_relations,
+    send_status_to_queue,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "save_messages",
     "save_replies",
     "save_relations",
+    "send_status_to_queue",
 ]

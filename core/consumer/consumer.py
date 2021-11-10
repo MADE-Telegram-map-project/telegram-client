@@ -25,7 +25,7 @@ class Consumer:
         self._connection = None
         self._channel = None
         self._consume_queue = config.input_queue
-        self._logger = logging.getLogger(__name__)
+        self._logger = logging.getLogger("consumer")
         self._input_queue = input_queue
         self._output_queue = output_queue
 
@@ -54,10 +54,8 @@ class Consumer:
         while True:
             try:
                 result: ProcessingResult = self._input_queue.get_nowait()
-                print(result)
             except queue.Empty:
                 self._connection.sleep(self._config.sleep_timeout_in_sec)
-                print("gagaga")
             else:
                 break
 
