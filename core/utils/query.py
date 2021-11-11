@@ -29,6 +29,8 @@ def cool_exceptor(func):
                 self.logger.critical(
                     "After {} times of waiting there are no progress"
                     .format(retries))
+                self.notify("After {} times of waiting there are no progress"
+                    .format(retries))
                 delay_time = self.get_request_delay() * 5  # a bit longer
                 sleep(delay_time)
                 return None
@@ -83,11 +85,12 @@ def cool_exceptor(func):
                     status = "wait"
                 else:
                     self.logger.critical("Weird runtime error \n" + str(e))
+                    self.notify("Weird runtime error \n" + repr(e))
                     status = "error"
-                    # self.write_final_stats(successful, start_time)
             except Exception as e:  # ok, it seems like
                 self.logger.critical(
                     "it seems like it's over for now; {}".format(repr(e)))
+                self.notify("it seems like it's over for now; {}".format(repr(e)))
                 status = "error"
                 # self.write_final_stats(successful, start_time)
         return result

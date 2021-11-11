@@ -155,54 +155,29 @@ def save_relations(relations: list[ChannelRelationData], session_cls: Session):
 
 
 def send_status_to_queue(username: str, status: str, session_cls: Session):
+    """ if username is in db, change status, else add new record """
     assert status in STATUSES, "such status {} is not allowable".format(status)
     with session_cls() as session:
-        session.query(ChannelQueue)\
-                .filter(ChannelQueue.channel_link == username)\
-                .update({"status": status})
+        record = session.query(ChannelQueue).filter(
+                ChannelQueue.channel_link == username).first()
+        if record is not None:
+            session.query(ChannelQueue)\
+                    .filter(ChannelQueue.channel_link == username)\
+                    .update({"status": status})
+        else:
+            session.add(ChannelQueue(channel_link=username, status=status))
         session.commit()
-
-
-if __name__ == "__main__":
-    config_path = "configs/client_config.yml"
-    base_config = OmegaConf.load(config_path)
-    schema = OmegaConf.structured(AppConfig)
-    config = OmegaConf.merge(schema, base_config)
-    config: AppConfig = OmegaConf.to_object(config)
     
 
+def is_done(username: str, session_cls: Session) -> bool:
+    with session_cls() as session:
+        record = session.query(ChannelQueue).filter(
+                ChannelQueue.channel_link == username,
+                ChannelQueue.status.in_(["ok", "error"])).first()
+        if record is not None:
+            return True
+    return False
 
 
-
-
-# def save_links_to_queue(usernames: Set[str], config: AppConfig):
-#     """ add channel usernames to queue """
-#     engine = create_engine(config.database.db_url)
-#     Session = sessionmaker(bind=engine)
-#     with Session() as session:
-#         for username in usernames:
-#             record = session.query(ChannelQueue).filter(
-#                 ChannelQueue.channel_link == username).first()
-#             if record is None:
-#                 session.add(ChannelQueue(channel_link=username, status="to_process"))
-#                 session.commit()
-
-
-# def save_neighbours(relations: list[ChannelRelationData], config: AppConfig):
-#     """ add pair of connected channels to db """
-#     engine = create_engine(config.database.db_url)
-#     Session = sessionmaker(bind=engine)
-#     with Session() as session:
-#         for rel in relations:
-#             record = session.query(ChannelRelation).filter(
-#                     ChannelRelation.from_channel_id == rel.from_channel_id,
-#                     ChannelRelation.to_channel_link == rel.to_channel_link,
-#                     ChannelRelation.to_channel_id == rel.to_channel_id,
-#                 ).first()
-#             if record is None:
-#                 session.add(ChannelRelation(
-#                     from_channel_id=rel.from_channel_id,
-#                     to_channel_link=rel.to_channel_link,
-#                     to_channel_id=rel.to_channel_id,
-#                 ))
-#                 session.commit()
+def is_ready_to_process(username: str, session_cls: Session) -> bool:
+    return not is_done(username, session_cls)

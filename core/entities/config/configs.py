@@ -30,7 +30,7 @@ class MessageBrokerConfigSchema:
     host: str = MISSING
     port: int = MISSING
     auto_ack: bool = False
-    heartbeat: Optional[int] = 0
+    heartbeat: Optional[int] = 50400  # 0
     sleep_timeout_in_sec: int = 3
 
 

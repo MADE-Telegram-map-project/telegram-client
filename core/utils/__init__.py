@@ -7,6 +7,8 @@ from .data import (
     save_replies,
     save_relations,
     send_status_to_queue,
+    is_ready_to_process,
+    is_done,
 )
 
 __all__ = [
@@ -18,4 +20,6 @@ __all__ = [
     "save_replies",
     "save_relations",
     "send_status_to_queue",
+    "is_ready_to_process",
+    "is_done",
 ]

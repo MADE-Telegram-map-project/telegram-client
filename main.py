@@ -13,8 +13,8 @@ def main(config: AppConfig):
     input_queue = queue.Queue(maxsize=maxsize)
     output_queue = queue.Queue(maxsize=maxsize)
 
-    consumer = Consumer(config.message_broker, input_queue, output_queue)
     crawler = Crawler(config, input_queue, output_queue)
+    consumer = Consumer(config.message_broker, input_queue, output_queue, crawler)
 
     # # Other thread can receive message from output_queue and
     # # add processign result to input_queue

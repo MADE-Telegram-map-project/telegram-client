@@ -64,3 +64,4 @@ class ChannelRelationData:
     from_channel_id: int
     to_channel_link: Union[str, None] = None
     to_channel_id: Union[int, None] = None
+    type: Union[str, None] = None

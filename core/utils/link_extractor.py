@@ -1,5 +1,6 @@
 import re
 from typing import List, Set, Tuple, Union
+from sqlalchemy.orm import relation
 
 from telethon.helpers import TotalList
 from telethon.tl.patched import Message
@@ -11,6 +12,7 @@ from telethon.tl.types import (
     MessageEntityUrl
 )
 
+from core.entities import ChannelRelationData
 
 about = '''
 Такую латынь ты по учебникам не выучишь.\n
@@ -34,11 +36,16 @@ Big Data Science [RU] — канал о жизни Data Science.
 💼 — https://t.me/bds_job — channel about Data Science jobs and career
 
 @RandomBot
-'''
+@kposffffffffffffkposffffffffffffdss
+@ffkaab
+@endless'''
+# usernames https://core.telegram.org/method/account.checkUsername
+# Accepted characters: A-z (case-insensitive), 0-9 and underscores.
+# Length: 5-32 characters.
 
-endpoints = "[\n\\s\t\\.\\,\\!\\?:;'\"/]"
-username_pattern = re.compile("{}(@.+?){}".format(endpoints, endpoints))
-link_pattern = re.compile("(t.me/.+?){}".format(endpoints))
+accepted_username = "[A-Za-z0-9_]{5,32}"
+link_pattern = re.compile("(t.me/{})".format(accepted_username))
+username_pattern = re.compile("[^A-Za-z0-9_](@{})".format(accepted_username))
 
 
 def extract_fwd_channel(msg: Message) -> Union[int, None]:
@@ -108,24 +115,48 @@ def extract_usernames_from_media(msg: Message) -> List[str]:
 
 
 def extract_usernames(
-    channel_about: str, messages: TotalList) -> Tuple[Set[str], Set[int]]:
+    channel_id: int,
+    channel_about: str, 
+    messages: TotalList) -> Tuple[List[ChannelRelationData], int, int, int]:
     """ main func to release all neighbour channels """
-    usernames = set(extract_usernames_from_text(channel_about))
-    ids = set()
+    head_usernames = set(extract_usernames_from_text(channel_about))
+    direct_usernames = set()
+    fwd_ids = set()
+
     for msg in messages:
         fwd_channel = extract_fwd_channel(msg)
         if fwd_channel is not None:
-            ids.add(fwd_channel)
+            fwd_ids.add(fwd_channel)
 
         ent_usernames = extract_usernames_from_entities(msg)
         med_usernames = extract_usernames_from_media(msg)
 
         for uname in ent_usernames:
-            usernames.add(uname)
+            direct_usernames.add(uname)
         for uname in med_usernames:
-            usernames.add(uname)
+            direct_usernames.add(uname)
+    
+    relations = []
+    for uname in head_usernames:
+        relations.append(ChannelRelationData(
+            channel_id,
+            to_channel_link=uname,
+            type="header", 
+        ))
+    for uname in direct_usernames:
+        relations.append(ChannelRelationData(
+            channel_id,
+            to_channel_link=uname,
+            type="direct", 
+        ))
+    for idx in fwd_ids:
+        relations.append(ChannelRelationData(
+            channel_id,
+            to_channel_id=idx,
+            type="forward", 
+        ))
 
-    return usernames, ids
+    return relations, len(head_usernames), len(direct_usernames), len(fwd_ids)
 
 
 if __name__ == "__main__":
