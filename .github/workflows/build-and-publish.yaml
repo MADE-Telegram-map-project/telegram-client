@@ -41,7 +41,7 @@ jobs:
 
         - name: Image name
           id: get_image_name
-          run: echo "::set-output name=image_name::database-seed:${CI_REF_NAME_SLUG}"
+          run: echo "::set-output name=image_name::tg-client:${CI_REF_NAME_SLUG}"
 
         - name: Build producer image
           env:
