@@ -95,8 +95,6 @@ class Crawler():
         engine = create_engine(self.config.database.db_url)
         self.db_session_cls = sessionmaker(bind=engine)
         self.local_queue = Queue()
-        for x in [1251153893, 1117457206, 1499717236, 1190595187, 1243038268, 1489176213, 1416855018, 1211069340]:
-            self.local_queue.put(x)
         # self.local_queue.put(1149710531)
         self.input_queue = input_queue
         self.output_queue = output_queue
@@ -509,16 +507,3 @@ class Crawler():
         if to_log:
             self.logger.info('Going to sleep for {} sec'.format(str(delay)))
         sleep(delay)
-
-    def _form_relation_data(
-            self, channel_id: int,
-            new_ids: Set[int],
-            new_usernames: Set[str]) -> List[ChannelRelationData]:
-        """ form normal data view for relations and load ids to local queue """
-        relations = []
-        for nid in new_ids:
-            self.local_queue.put(nid)
-            relations.append(ChannelRelationData(channel_id, to_channel_id=nid))
-        for nuname in new_usernames:
-            relations.append(ChannelRelationData(channel_id, to_channel_link=nuname))
-        return relations

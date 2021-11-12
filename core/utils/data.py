@@ -102,7 +102,7 @@ def save_messages(messages: List[MessageData], session_cls: Session):
     return
 
 
-def save_replies(replies: list[ReplyData], session_cls: Session):
+def save_replies(replies: List[ReplyData], session_cls: Session):
     """ add message replies to db """
     with session_cls() as session:
         for rlp in replies:
@@ -124,7 +124,7 @@ def save_replies(replies: list[ReplyData], session_cls: Session):
     return
 
 
-def save_relations(relations: list[ChannelRelationData], session_cls: Session):
+def save_relations(relations: List[ChannelRelationData], session_cls: Session):
     """ add channel usernames to queue & add pair of connected channels to db """
     with session_cls() as session:
         for rel in relations:
