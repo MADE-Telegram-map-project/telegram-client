@@ -44,7 +44,6 @@ jobs:
           run: echo "::set-output name=image_name::database-seed:${CI_REF_NAME_SLUG}"
 
         - name: Build producer image
-          working-directory: ${{ github.workspace }}/db_init
           env:
             DOCKER_BUILDKIT: 1
           run: docker build -t ${{ steps.get_image_name.outputs.image_name }} --label "runnumber=${GITHUB_RUN_ID}" .
