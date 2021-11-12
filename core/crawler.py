@@ -178,7 +178,8 @@ class Crawler():
                 self.logger.info("Sent 'error' and db-queue")
             elif status is None:
                 self.logger.info(
-                    "Username {} from rabbitMQ is already done".format(username))
+                    "Username {} from rabbitMQ is already done or raised error"
+                    .format(username))
 
             if not local_process:
                 self.input_queue.put(ProcessingResult(None, status))
@@ -204,7 +205,7 @@ class Crawler():
             if full_data is None:
                 self.logger.info("Cannot get channel full; go to next chanel")
                 self.wait()
-                return username, ProcessingStatus.FAIL
+                return username, None
             else:
                 full_data, full_data_raw = full_data
                 channel_id = full_data.channel_id
@@ -303,7 +304,7 @@ class Crawler():
             error_msg = repr(e)
             self.logger.critical(error_msg)
             self.notify(error_msg)
-            return username, ProcessingStatus.FAIL_NEED_REQUEUE
+            return username, ProcessingStatus.FAIL
 
     @cool_exceptor
     def get_channel_full(
