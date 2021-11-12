@@ -29,14 +29,12 @@ WORKDIR /home/app
 # ---------------
 # my custom files
 
-COPY ./config ./
+COPY ./configs ./configs
 
-COPY ./core ./
+COPY ./core ./core
 
 RUN mkdir data logs
 
 COPY ./main.py ./
 
-# COPY ./client1.session ./  !!!!!!!!!!!!!!!!!!
-
-CMD python ./main.py
+CMD python main.py
