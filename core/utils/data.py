@@ -138,6 +138,7 @@ def save_relations(relations: List[ChannelRelationData], session_cls: Session):
                     from_channel_id=rel.from_channel_id,
                     to_channel_link=rel.to_channel_link,
                     to_channel_id=rel.to_channel_id,
+                    link_type=rel.type,
                 ))
                 session.commit()
 

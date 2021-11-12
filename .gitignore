@@ -12,3 +12,4 @@ dist
 build
 data/*
 !data/.gitkeep
+client2.session-journal
