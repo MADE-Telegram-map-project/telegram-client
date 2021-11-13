@@ -11,7 +11,6 @@ from typing import List, Tuple, Union, Set
 from sqlalchemy.sql.functions import user
 
 import yaml
-from omegaconf import OmegaConf
 from sqlalchemy.orm import relation, sessionmaker, Session
 from sqlalchemy import create_engine
 from telethon import types
@@ -24,21 +23,19 @@ from telethon.tl.functions.messages import (GetRepliesRequest,
 from telethon.tl.types import InputPeerChannel, PeerChannel, TLObject
 from telethon.tl.types.messages import ChannelMessages, ChatFull, SearchCounter
 
-from core.entities import (AppConfig, FullChannelData, ChannelRelationData,
-                           MediaChannelData, MessageData, ReplyData, UserData)
+from core.entities import (AppConfig, FullChannelData, MediaChannelData,
+                           MessageData, ReplyData, UserData, ProcessingStatus)
 from core.utils import (
     cool_exceptor,
     extract_usernames,
     save_header,
     save_users,
     save_messages,
-    save_replies,
     save_relations,
     send_status_to_queue,
-    is_ready_to_process,
     is_done,
+    get_channel_from_db
 )
-from core.consumer.message_schema import ProcessingResult, ProcessingStatus
 
 
 class Crawler():
@@ -53,6 +50,7 @@ class Crawler():
     min_delay = 10  # 60
     max_delay = 20  # 120
     qcutoff = 0.5  # frequency of using of local queue
+    max_passes_num = 100
     media_filters = [
         types.InputMessagesFilterPhotos(),
         types.InputMessagesFilterVideo(),
@@ -66,7 +64,6 @@ class Crawler():
     def __init__(
             self,
             config: AppConfig,
-            input_queue: Queue, output_queue: Queue,
             activate_logging=True,
             logging_config_path="configs/logger_config.yml",
             dump_path="data/raw",
@@ -87,11 +84,11 @@ class Crawler():
         self.successful = 0
         self.chat_member = False
         engine = create_engine(self.config.database.db_url)
+        engine_ser = engine.execution_options(isolation_level='SERIALIZABLE')
         self.db_session_cls = sessionmaker(bind=engine)
+        self.db_session_cls_ser = sessionmaker(bind=engine_ser)
         self.local_queue = Queue()
         # self.local_queue.put(1149710531)
-        self.input_queue = input_queue
-        self.output_queue = output_queue
 
     def __authorize(self):
         client = TelegramClient(
@@ -123,31 +120,21 @@ class Crawler():
         self.notify(stop_message, "kpotoh")
 
     def crawl(self):
-        while True:
-            local_process = False
+        self.wait(random.randint(0, 15))  # random initiation for clients
+        n_passes = 0
+        while n_passes < self.max_passes_num:
             if not self.local_queue.empty() and random.random() > self.qcutoff:
-                local_process = True
                 username = self.local_queue.get()
-                self.logger.info(
-                    "Got channel id {} from local queue".format(username))
+                self.logger.info("Got channel id {} from local queue".format(username))
             else:
-                self.wait(1)  # wait while output_queue is full on start
-                if not self.output_queue.empty():
-                    channel_data = self.output_queue.get()
-                    username = channel_data["link"]
-
-                    if is_done(username, self.db_session_cls):
-                        self.logger.info(
-                            "Username {} from rabbitMQ is already done".format(username))
-                        self.input_queue.put(
-                            ProcessingResult(None, ProcessingStatus.SUCCESS))
-                        continue
-
-                    self.logger.info(
-                        "Got username {} from rabbitMQ".format(username))
-                else:
+                username = get_channel_from_db(self.db_session_cls_ser)
+                if username is None:
                     self.wait()
+                    n_passes += 1
+                    self.logger.warn("There are no usernames to process in db")
                     continue
+
+                self.logger.info("Got username {} from db".format(username))
 
             channel_username, status = self.parse_channel(username)
             if status == ProcessingStatus.SUCCESS:
@@ -157,49 +144,42 @@ class Crawler():
             elif status == ProcessingStatus.FAIL:
                 send_status_to_queue(
                     channel_username, "error", self.db_session_cls)
-                self.logger.info("Sent 'error' to db-queue")
-            elif status is None:
-                self.logger.info(
-                    "Channel {} is already done or raised error"
-                    .format(username))
+                self.logger.debug("Sent 'error' to db-queue")
 
-            if not local_process:
-                self.input_queue.put(ProcessingResult(None, status))
-                self.logger.debug(
-                    "Sent {} to consumer input_queue".format(str(status)))
-            else:
-                self.logger.debug("Channel {} from inner queue processed with {}"
-                                  .format(channel_username, str(status)))
+            self.logger.debug("Channel {} from inner queue processed with {}"
+                              .format(channel_username, str(status)))
 
     def parse_channel(
-            self, username: Union[int, str]) -> Tuple[str, ProcessingStatus]:
+            self, channel: Union[int, str]) -> Tuple[str, ProcessingStatus]:
         ''' that is the main method responsible for the parse of the messages
             TODO: complete the description
             TODO add notify to critical errors
         '''
+        is_inner_processing = isinstance(channel, int)
         try:
             start_time = time()
-            self.logger.debug("Started iteration for {}".format(username))
+            self.logger.debug("Started iteration for {}".format(channel))
 
             ########## FULL ##########
             self.logger.debug("Run channel full extraction")
-            full_data = self.get_channel_full(username)
+            full_data = self.get_channel_full(channel)
             if full_data is None:
                 self.logger.warn("Cannot get channel full; go to next chanel")
                 self.wait()
-                return username, None
+                if is_inner_processing:
+                    return channel, ProcessingStatus.PASS
+                return channel, ProcessingStatus.FAIL
             else:
                 full_data, full_data_raw = full_data
                 channel_id = full_data.channel_id
-
-                if channel_id == username:  # if from local queue
-                    if is_done(full_data.username, self.db_session_cls):
-                        return full_data.username, None
-
                 username = full_data.username
-                self.logger.info(
-                    "Got channel full - username: {}, id: {}".format(
-                        full_data.username, channel_id))
+                self.logger.info("Got channel full - username: {}, id: {}"
+                                 .format(username, channel_id))
+
+                if is_inner_processing and is_done(username, self.db_session_cls):
+                    self.logger.info("Channel from inner queue is already done")
+                    return username, ProcessingStatus.PASS
+
                 self.save_to_json(full_data_raw, "full", channel_id)
 
             self.wait()
@@ -207,7 +187,7 @@ class Crawler():
             if _pc < self.min_participants_count:
                 self.logger.info(
                     'Small channel, {} participants, pass it'.format(_pc))
-                return username, ProcessingStatus.FAIL  # small
+                return username, ProcessingStatus.FAIL
 
             ########## MEDIA ##########
             self.logger.debug('Run channel media counts extraction')
@@ -222,7 +202,6 @@ class Crawler():
 
             save_header(full_data, media_data, self.db_session_cls)
             self.logger.debug("Header saved to db")
-
             self.wait()
 
             ########## CHAT ##########

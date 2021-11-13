@@ -111,7 +111,8 @@ def extract_usernames_from_media(msg: Message) -> List[str]:
                 if len(links) == 1:
                     usernames.append(links[0])
     except Exception as e:
-        print(repr(e))
+        # print(repr(e))
+        pass
     return usernames
 
 

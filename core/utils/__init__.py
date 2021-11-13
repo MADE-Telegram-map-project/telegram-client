@@ -9,6 +9,7 @@ from .data import (
     send_status_to_queue,
     is_ready_to_process,
     is_done,
+    get_channel_from_db,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "send_status_to_queue",
     "is_ready_to_process",
     "is_done",
+    "get_channel_from_db",
 ]
