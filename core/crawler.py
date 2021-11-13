@@ -79,7 +79,7 @@ class Crawler():
         self.logger = logging.getLogger("client")
         if activate_logging:
             self.__init_logging()
-        self.logger.info("*** New run ***")
+        self.logger.debug("*** New run ***")
 
         self.config = config
         self.client = self.__authorize()
@@ -109,7 +109,7 @@ class Crawler():
             client.sign_in(code=input('Enter code: '))
         except SessionPasswordNeededError:
             client.sign_in(password=getpass.getpass())
-        self.logger.info("Authorized")
+        self.logger.debug("Authorized")
         return client
 
     def __init_logging(self):
@@ -119,7 +119,7 @@ class Crawler():
 
     def end_parsing(self):
         stop_message = "Crawling done, successful calls: {}".format(self.successful)
-        self.logger.warn(stop_message)
+        self.logger.info(stop_message)
         self.notify(stop_message, "kpotoh")
 
     def crawl(self):
@@ -128,7 +128,7 @@ class Crawler():
             if not self.local_queue.empty() and random.random() > self.qcutoff:
                 local_process = True
                 username = self.local_queue.get()
-                self.logger.warn(
+                self.logger.info(
                     "Got channel id {} from local queue".format(username))
             else:
                 self.wait(1)  # wait while output_queue is full on start
@@ -137,13 +137,13 @@ class Crawler():
                     username = channel_data["link"]
 
                     if is_done(username, self.db_session_cls):
-                        self.logger.warn(
+                        self.logger.info(
                             "Username {} from rabbitMQ is already done".format(username))
                         self.input_queue.put(
                             ProcessingResult(None, ProcessingStatus.SUCCESS))
                         continue
 
-                    self.logger.warn(
+                    self.logger.info(
                         "Got username {} from rabbitMQ".format(username))
                 else:
                     self.wait()
@@ -153,22 +153,22 @@ class Crawler():
             if status == ProcessingStatus.SUCCESS:
                 send_status_to_queue(
                     channel_username, "ok", self.db_session_cls)
-                self.logger.info("Sent 'ok' to db-queue")
+                self.logger.debug("Sent 'ok' to db-queue")
             elif status == ProcessingStatus.FAIL:
                 send_status_to_queue(
                     channel_username, "error", self.db_session_cls)
-                self.logger.warn("Sent 'error' to db-queue")
+                self.logger.info("Sent 'error' to db-queue")
             elif status is None:
-                self.logger.warn(
+                self.logger.info(
                     "Channel {} is already done or raised error"
                     .format(username))
 
             if not local_process:
                 self.input_queue.put(ProcessingResult(None, status))
-                self.logger.info(
+                self.logger.debug(
                     "Sent {} to consumer input_queue".format(str(status)))
             else:
-                self.logger.info("Channel {} from inner queue processed with {}"
+                self.logger.debug("Channel {} from inner queue processed with {}"
                                  .format(channel_username, str(status)))
 
     def parse_channel(
@@ -179,10 +179,10 @@ class Crawler():
         '''
         try:
             start_time = time()
-            self.logger.info("Started iteration for {}".format(username))
+            self.logger.debug("Started iteration for {}".format(username))
 
             ########## FULL ##########
-            self.logger.info("Run channel full extraction")
+            self.logger.debug("Run channel full extraction")
             full_data = self.get_channel_full(username)
             if full_data is None:
                 self.logger.warn("Cannot get channel full; go to next chanel")
@@ -197,7 +197,7 @@ class Crawler():
                         return full_data.username, None
 
                 username = full_data.username
-                self.logger.warn(
+                self.logger.info(
                     "Got channel full - username: {}, id: {}".format(
                         full_data.username, channel_id))
                 self.save_to_json(full_data_raw, "full", channel_id)
@@ -205,79 +205,79 @@ class Crawler():
             self.wait()
             _pc = full_data.participants_count
             if _pc < self.min_participants_count:
-                self.logger.warn(
+                self.logger.info(
                     'Small channel, {} participants, pass it'.format(_pc))
                 return username, ProcessingStatus.FAIL  # small
 
             ########## MEDIA ##########
-            self.logger.info('Run channel media counts extraction')
+            self.logger.debug('Run channel media counts extraction')
             media_data = self.get_header_media_counts(channel_id)
             if media_data is None:
                 self.logger.error("Cannot get channel media counts, continue crawling")
                 media_data = (MediaChannelData(), None)  # default zeros
             else:
-                self.logger.info("Media counts extracted")
+                self.logger.debug("Media counts extracted")
                 media_data, media_data_raw = media_data
                 self.save_to_json(media_data_raw, "media", channel_id)
 
             save_header(full_data, media_data, self.db_session_cls)
-            self.logger.info("Header saved to db")
+            self.logger.debug("Header saved to db")
 
             self.wait()
 
             ########## CHAT ##########
             chat_users = []
             if full_data.linked_chat_id is not None:
-                self.logger.info("Extract linked chat (id={}) users"
+                self.logger.debug("Extract linked chat (id={}) users"
                                     .format(full_data.linked_chat_id))
                 chat_users = self.get_linked_chat_members(
                     channel_id, full_data.linked_chat_id)
                 if chat_users is None:
                     self.logger.error("Cannot get linked chat users, continue crawling")
                 else:
-                    self.logger.info("{} users extracted from linked chat"
+                    self.logger.debug("{} users extracted from linked chat"
                                         .format(len(chat_users[0])))
                     chat_users, chat_users_raw = chat_users
                     self.save_to_json(
                         chat_users_raw, "linked_chat", channel_id)
                     save_users(chat_users, self.db_session_cls)
-                    self.logger.info("Linked chat users saved to db")
+                    self.logger.debug("Linked chat users saved to db")
                 self.wait()
             else:
-                self.logger.info("There are no linked chat")
+                self.logger.debug("There are no linked chat")
 
             ########## MESSAGES ##########
-            self.logger.info("Start retrieving of messages from channel")
+            self.logger.debug("Start retrieving of messages from channel")
             messages = self.get_messages(channel_id)
             if messages is None:
                 self.logger.error("Cannot retrieve channel messages, continue crawling")
             else:
-                self.logger.info("Retrieved {} messages".format(
+                self.logger.debug("Retrieved {} messages".format(
                     len(messages[0])))
                 messages, messages_raw = messages
                 self.save_to_json(messages_raw, "messages", channel_id)
                 save_messages(messages, self.db_session_cls)
-                self.logger.info("Messages saved to db and drive")
+                self.logger.debug("Messages saved to db and drive")
 
             ########## NEW CHANNELS ##########
-            self.logger.info(
+            self.logger.debug(
                 "Start extraction of new usernames from messages and about")
             relations, nhead, ndirect, nfwd = extract_usernames(
                 channel_id, full_data.about, messages_raw)
-            self.logger.info("Extracted {} new head usernames".format(nhead))
-            self.logger.info("Extracted {} new direct usernames".format(ndirect))
-            self.logger.info("Extracted {} new fwd channel ids".format(nfwd))
+            self.logger.debug("Extracted {} new head usernames".format(nhead))
+            self.logger.debug("Extracted {} new direct usernames".format(ndirect))
+            self.logger.debug("Extracted {} new fwd channel ids".format(nfwd))
             for rel in relations:
                 if rel.type == "forward":
                     self.local_queue.put(rel.to_channel_id)
-            self.logger.info("Fwd channel ids put to local queue")
+            self.logger.debug("Fwd channel ids put to local queue")
 
             save_relations(relations, self.db_session_cls)
-            self.logger.info("Relations saved to db and usernames added to queue")
+            self.logger.debug("Relations saved to db and usernames added to queue")
 
             self.successful += 1
             spent_time = time() - start_time
-            self.logger.warn("Channel {} done in {:.2f} seconds".format(
+            self.logger.info("Channel {} done in {:.2f} seconds".format(
                 username, spent_time))
             self.wait()
             return username, ProcessingStatus.SUCCESS
@@ -446,7 +446,7 @@ class Crawler():
                 # need to pass meddage_id into this function
             else:
                 raise ValueError("label '{}' unsupported")
-        self.logger.info(
+        self.logger.debug(
             "{} dumped in {}".format(label.capitalize(), filepath))
 
     def is_channel(self, link: str) -> Tuple[bool, Union[None, int]]:
@@ -456,7 +456,7 @@ class Crawler():
             if isinstance(entity, InputPeerChannel):
                 return True, entity.channel_id
         except ValueError as e:
-            self.logger.info(repr(e))
+            self.logger.debug(repr(e))
         except Exception as e:
             self.logger.error(repr(e))
         return False, None
@@ -466,10 +466,10 @@ class Crawler():
         if not self.chat_member:
             self.chat_member = True
             self.client(JoinChannelRequest(chat))
-            self.logger.info("Joined to chat")
+            self.logger.debug("Joined to chat")
 
         self.client.send_message(chat, message)
-        self.logger.info("Sended message '{}' to chat".format(message))
+        self.logger.debug("Sended message '{}' to chat".format(message))
 
     @staticmethod
     def json_serial(obj):
@@ -489,5 +489,5 @@ class Crawler():
     def wait(self, delay: int = None, to_log=True):
         delay = delay or self.get_request_delay()
         if to_log:
-            self.logger.info('Going to sleep for {} sec'.format(str(delay)))
+            self.logger.debug('Going to sleep for {} sec'.format(str(delay)))
         sleep(delay)

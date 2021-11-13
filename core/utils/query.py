@@ -42,7 +42,7 @@ def cool_exceptor(func):
             # if we cann't get the channel, it means it doesn't really exist
             # anymore
             except (UsernameNotOccupiedError, UsernameInvalidError) as e:
-                self.logger.warn("DOES_NOT_EXIST")
+                self.logger.warn("Channel DOES_NOT_EXIST")
                 status = "error"
             except ValueError as e:
                 error_message = str(e)
