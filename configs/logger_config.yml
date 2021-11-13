@@ -8,11 +8,11 @@ handlers:
   full_file_handler:
     class: logging.FileHandler
     filename: logs/crawler_runs.log
-    level: INFO
+    level: DEBUG
     formatter: simple
   info_stream_handler:
     class: logging.StreamHandler
-    level: WARN
+    level: INFO
     formatter: simple
 loggers:
   client:
