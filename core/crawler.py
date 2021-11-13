@@ -169,7 +169,7 @@ class Crawler():
                     "Sent {} to consumer input_queue".format(str(status)))
             else:
                 self.logger.debug("Channel {} from inner queue processed with {}"
-                                 .format(channel_username, str(status)))
+                                  .format(channel_username, str(status)))
 
     def parse_channel(
             self, username: Union[int, str]) -> Tuple[str, ProcessingStatus]:
@@ -229,14 +229,14 @@ class Crawler():
             chat_users = []
             if full_data.linked_chat_id is not None:
                 self.logger.debug("Extract linked chat (id={}) users"
-                                    .format(full_data.linked_chat_id))
+                                  .format(full_data.linked_chat_id))
                 chat_users = self.get_linked_chat_members(
                     channel_id, full_data.linked_chat_id)
                 if chat_users is None:
                     self.logger.error("Cannot get linked chat users, continue crawling")
                 else:
                     self.logger.debug("{} users extracted from linked chat"
-                                        .format(len(chat_users[0])))
+                                      .format(len(chat_users[0])))
                     chat_users, chat_users_raw = chat_users
                     self.save_to_json(
                         chat_users_raw, "linked_chat", channel_id)
