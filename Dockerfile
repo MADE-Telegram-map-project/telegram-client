@@ -45,4 +45,4 @@ RUN chmod u+x ./*.sh
 
 ENTRYPOINT [ "./entrypoint.sh" ]
 
-CMD python main.py
+CMD python main.py -c configs/client_config.yml

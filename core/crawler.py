@@ -67,14 +67,13 @@ class Crawler():
             self,
             config: AppConfig,
             input_queue: Queue, output_queue: Queue,
-            config_path: str = None,
+            activate_logging=True,
             logging_config_path="configs/logger_config.yml",
             dump_path="data/raw",
-            activate_logging=True,
     ):
         '''
-        reads config values, creates logger and
-        authorizes the client if necessary
+        read config values, create logger and
+        authorize the client if necessary
         '''
         self.logging_config_path = logging_config_path
         self.logger = logging.getLogger("client")
@@ -82,29 +81,17 @@ class Crawler():
             self.__init_logging()
         self.logger.info("*** New run ***")
 
-        if config_path is not None:
-            self.config = self.__load_config(config_path)
-        else:
-            self.config = config
-
+        self.config = config
         self.client = self.__authorize()
         self.dump_path = dump_path
         self.successful = 0
         self.chat_member = False
-        self.activate_logging = activate_logging
         engine = create_engine(self.config.database.db_url)
         self.db_session_cls = sessionmaker(bind=engine)
         self.local_queue = Queue()
         # self.local_queue.put(1149710531)
         self.input_queue = input_queue
         self.output_queue = output_queue
-
-    def __load_config(self, config_path: str) -> AppConfig:
-        base_config = OmegaConf.load(config_path)
-        schema = OmegaConf.structured(AppConfig)
-        config = OmegaConf.merge(schema, base_config)
-        config: AppConfig = OmegaConf.to_object(config)
-        return config
 
     def __authorize(self):
         client = TelegramClient(
@@ -132,13 +119,10 @@ class Crawler():
 
     def end_parsing(self):
         stop_message = "Crawling done, successful calls: {}".format(self.successful)
-        self.logger.info(stop_message)
+        self.logger.warn(stop_message)
         self.notify(stop_message, "kpotoh")
 
     def crawl(self):
-        if not self.activate_logging:
-            self.__init_logging()
-
         while True:
             local_process = False
             if not self.local_queue.empty() and random.random() > self.qcutoff:
@@ -153,7 +137,7 @@ class Crawler():
                     username = channel_data["link"]
 
                     if is_done(username, self.db_session_cls):
-                        self.logger.info(
+                        self.logger.warn(
                             "Username {} from rabbitMQ is already done".format(username))
                         self.input_queue.put(
                             ProcessingResult(None, ProcessingStatus.SUCCESS))
@@ -173,10 +157,10 @@ class Crawler():
             elif status == ProcessingStatus.FAIL:
                 send_status_to_queue(
                     channel_username, "error", self.db_session_cls)
-                self.logger.info("Sent 'error' and db-queue")
+                self.logger.warn("Sent 'error' and db-queue")
             elif status is None:
-                self.logger.info(
-                    "Username {} from rabbitMQ is already done or raised error"
+                self.logger.warn(
+                    "Channel {} is already done or raised error"
                     .format(username))
 
             if not local_process:
@@ -201,7 +185,7 @@ class Crawler():
             self.logger.info("Run channel full extraction")
             full_data = self.get_channel_full(username)
             if full_data is None:
-                self.logger.info("Cannot get channel full; go to next chanel")
+                self.logger.warn("Cannot get channel full; go to next chanel")
                 self.wait()
                 return username, None
             else:
@@ -213,7 +197,7 @@ class Crawler():
                         return full_data.username, None
 
                 username = full_data.username
-                self.logger.info(
+                self.logger.warn(
                     "Got channel full - username: {}, id: {}".format(
                         full_data.username, channel_id))
                 self.save_to_json(full_data_raw, "full", channel_id)
@@ -221,7 +205,7 @@ class Crawler():
             self.wait()
             _pc = full_data.participants_count
             if _pc < self.min_participants_count:
-                self.logger.info(
+                self.logger.warn(
                     'Small channel, {} participants, pass it'.format(_pc))
                 return username, ProcessingStatus.FAIL  # small
 
@@ -293,7 +277,7 @@ class Crawler():
 
             self.successful += 1
             spent_time = time() - start_time
-            self.logger.info("Channel {} done in {:.2f} seconds".format(
+            self.logger.warn("Channel {} done in {:.2f} seconds".format(
                 username, spent_time))
             self.wait()
             return username, ProcessingStatus.SUCCESS

@@ -14,8 +14,7 @@ class Consumer:
     def __init__(self,
                  config: MessageBrokerConfigSchema,
                  input_queue: queue.Queue,
-                 output_queue: queue.Queue,
-                 crawler):
+                 output_queue: queue.Queue):
         credentials = pika.PlainCredentials(
             config.user, config.passwd, erase_on_connect=True)
         self._connection_params = pika.ConnectionParameters(
@@ -29,7 +28,6 @@ class Consumer:
         self._logger = logging.getLogger("consumer")
         self._input_queue = input_queue
         self._output_queue = output_queue
-        self.crawler = crawler
 
     def _set_connection(self):
         self._connection = pika.BlockingConnection(
@@ -95,7 +93,6 @@ class Consumer:
             self._logger.exception(
                 "Unexpected runtime error. Shutdown consumer")
         finally:
-            self.crawler.notify("Unexpected runtime error. Shutdown consumer")
             _ = self._channel.cancel()
             self._channel.close()
             self._connection.close()

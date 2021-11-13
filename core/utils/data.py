@@ -23,7 +23,8 @@ from core.db_seed.db import (
     ChannelQueue, Channels, Messages, UserChannel, ChannelRelation, Replies
 )
 
-STATUSES = {'ok', 'error', 'processing', 'to_process'}
+STATUSES = {"ok", "error", "processing", "to_process"}
+LINK_TYPES = {"direct", "forward", "header"}
 
 
 def _load_channel(idx: int) -> Union[int, str]:
@@ -134,6 +135,9 @@ def save_relations(relations: List[ChannelRelationData], session_cls: Session):
                     ChannelRelation.to_channel_id == rel.to_channel_id,
                 ).first()
             if record is None:
+                assert rel.type in LINK_TYPES, (
+                    "Invalid relation type {}".format(rel.type)
+                )
                 session.add(ChannelRelation(
                     from_channel_id=rel.from_channel_id,
                     to_channel_link=rel.to_channel_link,

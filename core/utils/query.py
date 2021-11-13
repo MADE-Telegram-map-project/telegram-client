@@ -42,13 +42,13 @@ def cool_exceptor(func):
             # if we cann't get the channel, it means it doesn't really exist
             # anymore
             except (UsernameNotOccupiedError, UsernameInvalidError) as e:
-                self.logger.info("DOES_NOT_EXIST")
+                self.logger.warn("DOES_NOT_EXIST")
                 status = "error"
             except ValueError as e:
                 error_message = str(e)
                 if error_message.startswith("No user has"):
                     status = "error"
-                    self.logger.info(error_message)
+                    self.logger.warn(error_message)
                 else:
                     status = "error"
                     self.logger.error(repr(e))
@@ -72,7 +72,7 @@ def cool_exceptor(func):
             except (TypeError, ChannelPrivateError) as e:
                 # with open(self.invalid_id_path, "a") as invalid_ids_file:
                 #     print(channel_record, file=invalid_ids_file)
-                self.logger.info(e)
+                self.logger.warn(e)
                 status = "error"
             except RuntimeError as e:
                 if "retries" in str(e):

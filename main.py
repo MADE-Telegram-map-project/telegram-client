@@ -1,7 +1,10 @@
+import argparse
+from logging import config
 import queue
 import threading
 
 from omegaconf import OmegaConf
+from yaml import load
 
 from core.consumer import Consumer
 from core.crawler import Crawler
@@ -14,7 +17,7 @@ def main(config: AppConfig):
     output_queue = queue.Queue(maxsize=maxsize)
 
     crawler = Crawler(config, input_queue, output_queue)
-    consumer = Consumer(config.message_broker, input_queue, output_queue, crawler)
+    consumer = Consumer(config.message_broker, input_queue, output_queue)
 
     # # Other thread can receive message from output_queue and
     # # add processign result to input_queue
@@ -25,10 +28,22 @@ def main(config: AppConfig):
     t.join()
 
 
-if __name__ == "__main__":
-    config_path = "configs/client_config.yml"
-    base_config = OmegaConf.load(config_path)
+def load_config() -> AppConfig:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config", type=str, required=True,
+                        help="A path to YAML configuration file")
+
+    args, reminder = parser.parse_known_args()
+    base_config = OmegaConf.load(args.config)
+    cli_config = OmegaConf.from_cli(reminder)
+
+    config = OmegaConf.merge(base_config, cli_config)
     schema = OmegaConf.structured(AppConfig)
-    config = OmegaConf.merge(schema, base_config)
+    config = OmegaConf.merge(schema, config)
     config: AppConfig = OmegaConf.to_object(config)
+    return config
+
+
+if __name__ == "__main__":
+    config = load_config()
     main(config)

@@ -12,7 +12,7 @@ handlers:
     formatter: simple
   info_stream_handler:
     class: logging.StreamHandler
-    level: INFO
+    level: WARN
     formatter: simple
 loggers:
   client:
