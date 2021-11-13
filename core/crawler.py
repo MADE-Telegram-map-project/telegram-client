@@ -128,7 +128,7 @@ class Crawler():
             if not self.local_queue.empty() and random.random() > self.qcutoff:
                 local_process = True
                 username = self.local_queue.get()
-                self.logger.info(
+                self.logger.warn(
                     "Got channel id {} from local queue".format(username))
             else:
                 self.wait(1)  # wait while output_queue is full on start
@@ -143,7 +143,7 @@ class Crawler():
                             ProcessingResult(None, ProcessingStatus.SUCCESS))
                         continue
 
-                    self.logger.info(
+                    self.logger.warn(
                         "Got username {} from rabbitMQ".format(username))
                 else:
                     self.wait()
@@ -157,7 +157,7 @@ class Crawler():
             elif status == ProcessingStatus.FAIL:
                 send_status_to_queue(
                     channel_username, "error", self.db_session_cls)
-                self.logger.warn("Sent 'error' and db-queue")
+                self.logger.warn("Sent 'error' to db-queue")
             elif status is None:
                 self.logger.warn(
                     "Channel {} is already done or raised error"
