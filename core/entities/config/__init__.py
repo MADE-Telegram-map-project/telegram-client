@@ -1,3 +1,3 @@
-from .configs import ClientConfigSchema, MessageBrokerConfigSchema, AppConfig
+from .configs import ClientConfigSchema, AppConfig
 
-__all__ = ["ClientConfigSchema", "MessageBrokerConfigSchema", "AppConfig"]
+__all__ = ["ClientConfigSchema", "AppConfig"]

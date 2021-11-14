@@ -1,5 +1,5 @@
 from typing import Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from omegaconf import MISSING
 
@@ -22,20 +22,6 @@ class DbConfigSchema:
 
 
 @dataclass
-class MessageBrokerConfigSchema:
-    input_queue: str = MISSING
-    input_durable: bool = field(default=True)
-    user: str = MISSING
-    passwd: str = MISSING
-    host: str = MISSING
-    port: int = MISSING
-    auto_ack: bool = True
-    heartbeat: Optional[int] = 50400  # 0
-    sleep_timeout_in_sec: int = 3
-
-
-@dataclass
 class AppConfig:
     client_config: ClientConfigSchema = MISSING
-    message_broker: MessageBrokerConfigSchema = MISSING
     database: DbConfigSchema = MISSING

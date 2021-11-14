@@ -1,4 +1,4 @@
-from .config.configs import ClientConfigSchema, MessageBrokerConfigSchema, AppConfig
+from .config.configs import ClientConfigSchema, AppConfig
 from .data.datas import (
     FullChannelData,
     MediaChannelData,
@@ -16,7 +16,6 @@ __all__ = [
     "MessageData",
     "UserData",
     "ReplyData",
-    "MessageBrokerConfigSchema",
     "AppConfig",
     "ChannelRelationData",
     "ProcessingStatus",
