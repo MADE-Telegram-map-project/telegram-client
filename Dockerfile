@@ -37,12 +37,6 @@ RUN mkdir data logs
 
 COPY ./main.py ./
 
-COPY ./scripts/entrypoint.sh ./
-
-COPY ./scripts/wait-it-and-start.sh ./
-
 RUN chmod u+x ./*.sh
-
-ENTRYPOINT [ "./entrypoint.sh" ]
 
 CMD python main.py -c configs/client_config.yml
