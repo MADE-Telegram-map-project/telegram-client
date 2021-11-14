@@ -83,7 +83,12 @@ class Crawler():
         self.dump_path = dump_path
         self.successful = 0
         self.chat_member = False
-        engine = create_engine(self.config.database.db_url)
+        engine = create_engine(
+            self.config.database.db_url,
+            pool_recycle=60,
+            pool_pre_ping=True,
+            pool_size=3,
+        )
         engine_ser = engine.execution_options(isolation_level='SERIALIZABLE')
         self.db_session_cls = sessionmaker(bind=engine)
         self.db_session_cls_ser = sessionmaker(bind=engine_ser)
