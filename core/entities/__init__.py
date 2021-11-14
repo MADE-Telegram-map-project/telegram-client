@@ -7,6 +7,7 @@ from .data.datas import (
     ReplyData,
     ChannelRelationData,
 )
+from .statuses import ProcessingStatus
 
 __all__ = [
     "ClientConfigSchema",
@@ -17,5 +18,6 @@ __all__ = [
     "ReplyData",
     "MessageBrokerConfigSchema",
     "AppConfig",
-    "ChannelRelationData"
+    "ChannelRelationData",
+    "ProcessingStatus",
 ]
