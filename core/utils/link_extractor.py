@@ -36,6 +36,7 @@ Big Data Science [RU] — канал о жизни Data Science.
 💼 — https://t.me/bds_job — channel about Data Science jobs and career
 
 @RandomBot
+@another_bot 
 @kposffffffffffffkposffffffffffffdss
 @ffkaab
 @endless'''

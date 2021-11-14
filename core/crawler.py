@@ -45,10 +45,10 @@ class Crawler():
     each method get_* do "one" query to api
 
     '''
-    min_participants_count = 10000
-    messages_limit = 1000
-    min_delay = 10
-    max_delay = 25
+    min_participants_count = 5000
+    messages_limit = 500
+    min_delay = 20
+    max_delay = 60
     qcutoff = 0.5  # frequency of using of local queue
     max_passes_num = 50
     media_filters = [
@@ -76,7 +76,7 @@ class Crawler():
         self.logger = logging.getLogger("client")
         if activate_logging:
             self.__init_logging()
-        self.logger.debug("*** New run ***")
+        self.logger.debug("*** New run *** {}".format(config.client_config.session))
 
         self.config = config
         self.client = self.__authorize()
@@ -123,33 +123,37 @@ class Crawler():
         self.wait(random.randint(0, 15))  # random initiation for clients
         n_passes = 0
         while n_passes < self.max_passes_num:
-            if not self.local_queue.empty() and random.random() > self.qcutoff:
-                username = self.local_queue.get()
-                self.logger.info("Got channel id {} from local queue".format(username))
-            else:
-                username = get_channel_from_db(self.db_session_cls_ser)
-                if username is None:
-                    self.wait()
-                    n_passes += 1
-                    self.logger.warn("There are no usernames to process in db")
-                    continue
+            try:
+                if not self.local_queue.empty() and random.random() > self.qcutoff:
+                    username = self.local_queue.get()
+                    self.logger.info("Got channel id {} from local queue".format(username))
+                else:
+                    username = get_channel_from_db(self.db_session_cls_ser)
+                    if username is None:
+                        n_passes += 1
+                        self.logger.warn("There are no usernames to process in db")
+                        continue
 
-                self.logger.info("Got username {} from db".format(username))
+                    self.logger.info("Got username {} from db".format(username))
 
-            channel_username, status = self.parse_channel(username)
-            if status == ProcessingStatus.SUCCESS:
-                n_passes = 0
-                send_status_to_queue(
-                    channel_username, "ok", self.db_session_cls)
-                self.logger.debug("Sent 'ok' to db-queue")
-            elif status == ProcessingStatus.FAIL:
-                n_passes = 0
-                send_status_to_queue(
-                    channel_username, "error", self.db_session_cls)
-                self.logger.debug("Sent 'error' to db-queue")
+                channel_username, status = self.parse_channel(username)
+                if status == ProcessingStatus.SUCCESS:
+                    n_passes = 0
+                    send_status_to_queue(
+                        channel_username, "ok", self.db_session_cls)
+                    self.logger.debug("Sent 'ok' to db-queue")
+                elif status == ProcessingStatus.FAIL:
+                    n_passes = 0
+                    send_status_to_queue(
+                        channel_username, "error", self.db_session_cls)
+                    self.logger.debug("Sent 'error' to db-queue")
 
-            self.logger.debug("Channel {} processed with {}"
-                              .format(channel_username, str(status)))
+                self.logger.debug("Channel {} processed with {}"
+                                .format(channel_username, str(status)))
+            
+            except Exception as e:
+                self.logger.critical("Global error: {}".format(repr(e)))
+                self.notify(repr(e))
         self.end_parsing()
 
     def parse_channel(
@@ -168,7 +172,8 @@ class Crawler():
             full_data = self.get_channel_full(channel)
             if full_data is None:
                 self.logger.warn("Cannot get channel full; go to next chanel")
-                self.wait()
+                delay = self.get_request_delay() * 2
+                self.wait(delay)
                 if is_inner_processing:
                     return channel, ProcessingStatus.PASS
                 return channel, ProcessingStatus.FAIL
@@ -182,6 +187,8 @@ class Crawler():
                 if is_inner_processing:
                     if is_done(username, self.db_session_cls):
                         self.logger.info("Channel from inner queue is already done")
+                        delay = self.get_request_delay() * 2
+                        self.wait(delay)
                         return username, ProcessingStatus.PASS
                     else:
                         send_status_to_queue(username, "processing", self.db_session_cls)
@@ -194,6 +201,8 @@ class Crawler():
             if _pc < self.min_participants_count:
                 self.logger.info(
                     'Small channel, {} participants, pass it'.format(_pc))
+                delay = self.get_request_delay() * 2
+                self.wait(delay)
                 return username, ProcessingStatus.FAIL
 
             ########## MEDIA ##########
@@ -449,13 +458,16 @@ class Crawler():
 
     def notify(self, message: str, chat="telemap_ctitical"):
         """ send `message` (notification) to chat """
-        if not self.chat_member:
-            self.chat_member = True
-            self.client(JoinChannelRequest(chat))
-            self.logger.debug("Joined to chat")
+        try:
+            if not self.chat_member:
+                self.chat_member = True
+                self.client(JoinChannelRequest(chat))
+                self.logger.debug("Joined to chat")
 
-        self.client.send_message(chat, message)
-        self.logger.debug("Sended message '{}' to chat".format(message))
+            self.client.send_message(chat, message)
+            self.logger.debug("Sent message '{}' to chat".format(message))
+        except:
+            self.logger.debug("Cannot send notification to chat")
 
     @staticmethod
     def json_serial(obj):

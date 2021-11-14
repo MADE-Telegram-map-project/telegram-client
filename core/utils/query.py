@@ -26,13 +26,11 @@ def cool_exceptor(func):
         retries = 0
         while status == "wait":
             if retries == 5:
-                self.logger.critical(
-                    "After {} times of waiting there are no progress"
-                    .format(retries))
-                self.notify("After {} times of waiting there are no progress"
-                    .format(retries))
+                error_msg = "After {} times of waiting there are no progress".format(retries)
+                self.logger.critical(error_message)
+                self.notify(error_message)
                 delay_time = self.get_request_delay() * 5  # a bit longer
-                sleep(delay_time)
+                self.wait(delay_time)
                 return None
 
             retries += 1
@@ -58,20 +56,19 @@ def cool_exceptor(func):
                     "We got internal error it seems, going to sleep " +
                     "for a while and continue; {}".format(str(e)))
                 delay_time = self.get_request_delay() * 5  # sleep a bit longer
-                sleep(delay_time)
+                self.wait(delay_time)
                 status = "wait"
             except FloodWaitError as e:
                 error_message = str(e)
                 time_to_sleep_flood = extract_flood_waiting_time(
                     error_message) + self.get_request_delay() * 10
-                self.logger.error(
-                    "We got flood ban; {}; going to sleep for {} seconds"
-                    .format(str(e), str(time_to_sleep_flood)))
-                sleep(time_to_sleep_flood)
+                error_msg = "We got flood ban; {}; going to sleep for {} seconds".format(
+                    str(e), str(time_to_sleep_flood))
+                self.logger.critical(error_msg)
+                self.notify(error_msg)
+                self.wait(time_to_sleep_flood)
                 status = "wait"
             except (TypeError, ChannelPrivateError) as e:
-                # with open(self.invalid_id_path, "a") as invalid_ids_file:
-                #     print(channel_record, file=invalid_ids_file)
                 self.logger.warn(e)
                 status = "error"
             except RuntimeError as e:
@@ -81,18 +78,17 @@ def cool_exceptor(func):
                         "We got the number of retries error, going to sleep " +
                         "for a while now and then continue; {}".format(str(e)))
                     delay_time = self.get_request_delay() * 5  # a bit longer
-                    sleep(delay_time)
+                    self.wait(delay_time)
                     status = "wait"
                 else:
                     self.logger.critical("Weird runtime error \n" + str(e))
                     self.notify("Weird runtime error \n" + repr(e))
                     status = "error"
             except Exception as e:  # ok, it seems like
-                self.logger.critical(
-                    "it seems like it's over for now; {}".format(repr(e)))
-                self.notify("it seems like it's over for now; {}".format(repr(e)))
+                error_msg = "it seems like it's over for now; {}".format(repr(e))
+                self.logger.critical(error_msg)
+                self.notify(error_msg)
                 status = "error"
-                # self.write_final_stats(successful, start_time)
         return result
     return wrapper
 
