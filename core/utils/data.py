@@ -182,10 +182,10 @@ def get_channel_from_db(session_cls: Session) -> Union[str, None]:
             ChannelQueue.status == "to_process").first()
         if record is None:
             return None
-
+        username = record.channel_link
         session.query(ChannelQueue)\
-            .filter(ChannelQueue.channel_link == record.channel_link)\
+            .filter(ChannelQueue.channel_link == username)\
             .update({"status": "processing"})
 
         session.commit()
-    return record.channel_link
+    return username

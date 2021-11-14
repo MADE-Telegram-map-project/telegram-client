@@ -7,6 +7,8 @@ from yaml import load
 from core.crawler import Crawler
 from core.entities import AppConfig
 
+DEFAULT_CONFIG_PATH = "configs/client_config.yml"
+
 
 def main(config: AppConfig):
     crawler = Crawler(config)
@@ -15,8 +17,10 @@ def main(config: AppConfig):
 
 def load_config() -> AppConfig:
     parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", type=str, required=True,
-                        help="A path to YAML configuration file")
+    parser.add_argument("-c", "--config", type=str, required=False,
+                        help="A path to YAML configuration file",
+                        default=DEFAULT_CONFIG_PATH,
+    )
 
     args, reminder = parser.parse_known_args()
     base_config = OmegaConf.load(args.config)

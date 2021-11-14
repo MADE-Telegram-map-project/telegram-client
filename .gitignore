@@ -1,4 +1,5 @@
 *.session
+*.session-journal
 client1.session-journal
 .vscode
 env*
@@ -12,4 +13,3 @@ dist
 build
 data/*
 !data/.gitkeep
-client2.session-journal

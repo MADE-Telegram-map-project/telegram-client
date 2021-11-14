@@ -45,12 +45,12 @@ class Crawler():
     each method get_* do "one" query to api
 
     '''
-    min_participants_count = 1000
-    messages_limit = 500  # 2000
-    min_delay = 10  # 60
-    max_delay = 20  # 120
+    min_participants_count = 10000
+    messages_limit = 1000
+    min_delay = 10
+    max_delay = 25
     qcutoff = 0.5  # frequency of using of local queue
-    max_passes_num = 100
+    max_passes_num = 50
     media_filters = [
         types.InputMessagesFilterPhotos(),
         types.InputMessagesFilterVideo(),
@@ -116,8 +116,8 @@ class Crawler():
 
     def end_parsing(self):
         stop_message = "Crawling done, successful calls: {}".format(self.successful)
-        self.logger.info(stop_message)
-        self.notify(stop_message, "kpotoh")
+        self.logger.critical(stop_message)
+        self.notify(stop_message)
 
     def crawl(self):
         self.wait(random.randint(0, 15))  # random initiation for clients
@@ -138,16 +138,19 @@ class Crawler():
 
             channel_username, status = self.parse_channel(username)
             if status == ProcessingStatus.SUCCESS:
+                n_passes = 0
                 send_status_to_queue(
                     channel_username, "ok", self.db_session_cls)
                 self.logger.debug("Sent 'ok' to db-queue")
             elif status == ProcessingStatus.FAIL:
+                n_passes = 0
                 send_status_to_queue(
                     channel_username, "error", self.db_session_cls)
                 self.logger.debug("Sent 'error' to db-queue")
 
-            self.logger.debug("Channel {} from inner queue processed with {}"
+            self.logger.debug("Channel {} processed with {}"
                               .format(channel_username, str(status)))
+        self.end_parsing()
 
     def parse_channel(
             self, channel: Union[int, str]) -> Tuple[str, ProcessingStatus]:
@@ -176,9 +179,13 @@ class Crawler():
                 self.logger.info("Got channel full - username: {}, id: {}"
                                  .format(username, channel_id))
 
-                if is_inner_processing and is_done(username, self.db_session_cls):
-                    self.logger.info("Channel from inner queue is already done")
-                    return username, ProcessingStatus.PASS
+                if is_inner_processing:
+                    if is_done(username, self.db_session_cls):
+                        self.logger.info("Channel from inner queue is already done")
+                        return username, ProcessingStatus.PASS
+                    else:
+                        send_status_to_queue(username, "processing", self.db_session_cls)
+                        self.logger.debug("Set status 'processing' to channel from inner queue")
 
                 self.save_to_json(full_data_raw, "full", channel_id)
 
