@@ -47,8 +47,8 @@ class Crawler():
     '''
     min_participants_count = 5000
     messages_limit = 500
-    min_delay = 20
-    max_delay = 60
+    min_delay = 40
+    max_delay = 70
     qcutoff = 0.5  # frequency of using of local queue
     max_passes_num = 50
     media_filters = [
@@ -468,7 +468,10 @@ class Crawler():
                 self.chat_member = True
                 self.client(JoinChannelRequest(chat))
                 self.logger.debug("Joined to chat")
-
+        except:
+            self.logger.debug("Cannot join to chat")
+        
+        try:
             self.client.send_message(chat, message)
             self.logger.debug("Sent message '{}' to chat".format(message))
         except:
