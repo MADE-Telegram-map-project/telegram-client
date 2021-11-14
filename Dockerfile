@@ -37,6 +37,4 @@ RUN mkdir data logs
 
 COPY ./main.py ./
 
-RUN chmod u+x ./*.sh
-
 CMD python main.py -c configs/client_config.yml
