@@ -36,6 +36,7 @@ Big Data Science [RU] — канал о жизни Data Science.
 💼 — https://t.me/bds_job — channel about Data Science jobs and career
 
 @RandomBot
+@another_bot 
 @kposffffffffffffkposffffffffffffdss
 @ffkaab
 @endless'''
@@ -111,7 +112,8 @@ def extract_usernames_from_media(msg: Message) -> List[str]:
                 if len(links) == 1:
                     usernames.append(links[0])
     except Exception as e:
-        print(repr(e))
+        # print(repr(e))
+        pass
     return usernames
 
 

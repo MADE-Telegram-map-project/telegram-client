@@ -1,19 +1,6 @@
-import json
-import os
-import random
-from typing import Union, List, Set
+from typing import Union, List
 
-import argparse
-from urllib.parse import urlparse
-from collections import namedtuple
-import csv
-import os
-import logging
-
-from psycopg2 import sql
-from omegaconf import OmegaConf
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 from core.entities import (
     FullChannelData, MediaChannelData, ChannelRelationData,
@@ -108,10 +95,10 @@ def save_replies(replies: List[ReplyData], session_cls: Session):
     with session_cls() as session:
         for rlp in replies:
             record = session.query(Replies).filter(
-                    Replies.id == rlp.id,
-                    Replies.message_id == rlp.message_id,
-                    Replies.channel_id == rlp.channel_id,
-                ).first()
+                Replies.id == rlp.id,
+                Replies.message_id == rlp.message_id,
+                Replies.channel_id == rlp.channel_id,
+            ).first()
             if record is None:
                 session.add(Replies(
                     id=rlp.id,
@@ -130,10 +117,10 @@ def save_relations(relations: List[ChannelRelationData], session_cls: Session):
     with session_cls() as session:
         for rel in relations:
             record = session.query(ChannelRelation).filter(
-                    ChannelRelation.from_channel_id == rel.from_channel_id,
-                    ChannelRelation.to_channel_link == rel.to_channel_link,
-                    ChannelRelation.to_channel_id == rel.to_channel_id,
-                ).first()
+                ChannelRelation.from_channel_id == rel.from_channel_id,
+                ChannelRelation.to_channel_link == rel.to_channel_link,
+                ChannelRelation.to_channel_id == rel.to_channel_id,
+            ).first()
             if record is None:
                 assert rel.type in LINK_TYPES, (
                     "Invalid relation type {}".format(rel.type)
@@ -164,21 +151,21 @@ def send_status_to_queue(username: str, status: str, session_cls: Session):
     assert status in STATUSES, "such status {} is not allowable".format(status)
     with session_cls() as session:
         record = session.query(ChannelQueue).filter(
-                ChannelQueue.channel_link == username).first()
+            ChannelQueue.channel_link == username).first()
         if record is not None:
             session.query(ChannelQueue)\
-                    .filter(ChannelQueue.channel_link == username)\
-                    .update({"status": status})
+                .filter(ChannelQueue.channel_link == username)\
+                .update({"status": status})
         else:
             session.add(ChannelQueue(channel_link=username, status=status))
         session.commit()
-    
+
 
 def is_done(username: str, session_cls: Session) -> bool:
     with session_cls() as session:
         record = session.query(ChannelQueue).filter(
-                ChannelQueue.channel_link == username,
-                ChannelQueue.status.in_(["ok", "error"])).first()
+            ChannelQueue.channel_link == username,
+            ChannelQueue.status.in_(["ok", "error"])).first()
         if record is not None:
             return True
     return False
@@ -186,3 +173,19 @@ def is_done(username: str, session_cls: Session) -> bool:
 
 def is_ready_to_process(username: str, session_cls: Session) -> bool:
     return not is_done(username, session_cls)
+
+
+def get_channel_from_db(session_cls: Session) -> Union[str, None]:
+    """ session_cls must do SERIALIZABLE connections """
+    with session_cls() as session:
+        record = session.query(ChannelQueue).filter(
+            ChannelQueue.status == "to_process").first()
+        if record is None:
+            return None
+        username = record.channel_link
+        session.query(ChannelQueue)\
+            .filter(ChannelQueue.channel_link == username)\
+            .update({"status": "processing"})
+
+        session.commit()
+    return username

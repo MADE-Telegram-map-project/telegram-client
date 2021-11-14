@@ -11,7 +11,6 @@ from typing import List, Tuple, Union, Set
 from sqlalchemy.sql.functions import user
 
 import yaml
-from omegaconf import OmegaConf
 from sqlalchemy.orm import relation, sessionmaker, Session
 from sqlalchemy import create_engine
 from telethon import types
@@ -24,21 +23,19 @@ from telethon.tl.functions.messages import (GetRepliesRequest,
 from telethon.tl.types import InputPeerChannel, PeerChannel, TLObject
 from telethon.tl.types.messages import ChannelMessages, ChatFull, SearchCounter
 
-from core.entities import (AppConfig, FullChannelData, ChannelRelationData,
-                           MediaChannelData, MessageData, ReplyData, UserData)
+from core.entities import (AppConfig, FullChannelData, MediaChannelData,
+                           MessageData, ReplyData, UserData, ProcessingStatus)
 from core.utils import (
     cool_exceptor,
     extract_usernames,
     save_header,
     save_users,
     save_messages,
-    save_replies,
     save_relations,
     send_status_to_queue,
-    is_ready_to_process,
     is_done,
+    get_channel_from_db
 )
-from core.consumer.message_schema import ProcessingResult, ProcessingStatus
 
 
 class Crawler():
@@ -48,11 +45,12 @@ class Crawler():
     each method get_* do "one" query to api
 
     '''
-    min_participants_count = 1000
-    messages_limit = 500  # 2000
-    min_delay = 10  # 60
-    max_delay = 20  # 120
+    min_participants_count = 5000
+    messages_limit = 500
+    min_delay = 20
+    max_delay = 60
     qcutoff = 0.5  # frequency of using of local queue
+    max_passes_num = 50
     media_filters = [
         types.InputMessagesFilterPhotos(),
         types.InputMessagesFilterVideo(),
@@ -66,7 +64,6 @@ class Crawler():
     def __init__(
             self,
             config: AppConfig,
-            input_queue: Queue, output_queue: Queue,
             activate_logging=True,
             logging_config_path="configs/logger_config.yml",
             dump_path="data/raw",
@@ -79,7 +76,7 @@ class Crawler():
         self.logger = logging.getLogger("client")
         if activate_logging:
             self.__init_logging()
-        self.logger.debug("*** New run ***")
+        self.logger.debug("*** New run *** {}".format(config.client_config.session))
 
         self.config = config
         self.client = self.__authorize()
@@ -87,11 +84,11 @@ class Crawler():
         self.successful = 0
         self.chat_member = False
         engine = create_engine(self.config.database.db_url)
+        engine_ser = engine.execution_options(isolation_level='SERIALIZABLE')
         self.db_session_cls = sessionmaker(bind=engine)
+        self.db_session_cls_ser = sessionmaker(bind=engine_ser)
         self.local_queue = Queue()
         # self.local_queue.put(1149710531)
-        self.input_queue = input_queue
-        self.output_queue = output_queue
 
     def __authorize(self):
         client = TelegramClient(
@@ -119,87 +116,84 @@ class Crawler():
 
     def end_parsing(self):
         stop_message = "Crawling done, successful calls: {}".format(self.successful)
-        self.logger.info(stop_message)
-        self.notify(stop_message, "kpotoh")
+        self.logger.critical(stop_message)
+        self.notify(stop_message)
 
     def crawl(self):
-        while True:
-            local_process = False
-            if not self.local_queue.empty() and random.random() > self.qcutoff:
-                local_process = True
-                username = self.local_queue.get()
-                self.logger.info(
-                    "Got channel id {} from local queue".format(username))
-            else:
-                self.wait(1)  # wait while output_queue is full on start
-                if not self.output_queue.empty():
-                    channel_data = self.output_queue.get()
-                    username = channel_data["link"]
-
-                    if is_done(username, self.db_session_cls):
-                        self.logger.info(
-                            "Username {} from rabbitMQ is already done".format(username))
-                        self.input_queue.put(
-                            ProcessingResult(None, ProcessingStatus.SUCCESS))
+        self.wait(random.randint(0, 15))  # random initiation for clients
+        n_passes = 0
+        while n_passes < self.max_passes_num:
+            try:
+                if not self.local_queue.empty() and random.random() > self.qcutoff:
+                    username = self.local_queue.get()
+                    self.logger.info("Got channel id {} from local queue".format(username))
+                else:
+                    username = get_channel_from_db(self.db_session_cls_ser)
+                    if username is None:
+                        n_passes += 1
+                        self.logger.warn("There are no usernames to process in db")
                         continue
 
-                    self.logger.info(
-                        "Got username {} from rabbitMQ".format(username))
-                else:
-                    self.wait()
-                    continue
+                    self.logger.info("Got username {} from db".format(username))
 
-            channel_username, status = self.parse_channel(username)
-            if status == ProcessingStatus.SUCCESS:
-                send_status_to_queue(
-                    channel_username, "ok", self.db_session_cls)
-                self.logger.debug("Sent 'ok' to db-queue")
-            elif status == ProcessingStatus.FAIL:
-                send_status_to_queue(
-                    channel_username, "error", self.db_session_cls)
-                self.logger.info("Sent 'error' to db-queue")
-            elif status is None:
-                self.logger.info(
-                    "Channel {} is already done or raised error"
-                    .format(username))
+                channel_username, status = self.parse_channel(username)
+                if status == ProcessingStatus.SUCCESS:
+                    n_passes = 0
+                    send_status_to_queue(
+                        channel_username, "ok", self.db_session_cls)
+                    self.logger.debug("Sent 'ok' to db-queue")
+                elif status == ProcessingStatus.FAIL:
+                    n_passes = 0
+                    send_status_to_queue(
+                        channel_username, "error", self.db_session_cls)
+                    self.logger.debug("Sent 'error' to db-queue")
 
-            if not local_process:
-                self.input_queue.put(ProcessingResult(None, status))
-                self.logger.debug(
-                    "Sent {} to consumer input_queue".format(str(status)))
-            else:
-                self.logger.debug("Channel {} from inner queue processed with {}"
-                                  .format(channel_username, str(status)))
+                self.logger.debug("Channel {} processed with {}"
+                                .format(channel_username, str(status)))
+            
+            except Exception as e:
+                self.logger.critical("Global error: {}".format(repr(e)))
+                self.notify(repr(e))
+        self.end_parsing()
 
     def parse_channel(
-            self, username: Union[int, str]) -> Tuple[str, ProcessingStatus]:
+            self, channel: Union[int, str]) -> Tuple[str, ProcessingStatus]:
         ''' that is the main method responsible for the parse of the messages
             TODO: complete the description
             TODO add notify to critical errors
         '''
+        is_inner_processing = isinstance(channel, int)
         try:
             start_time = time()
-            self.logger.debug("Started iteration for {}".format(username))
+            self.logger.debug("Started iteration for {}".format(channel))
 
             ########## FULL ##########
             self.logger.debug("Run channel full extraction")
-            full_data = self.get_channel_full(username)
+            full_data = self.get_channel_full(channel)
             if full_data is None:
                 self.logger.warn("Cannot get channel full; go to next chanel")
-                self.wait()
-                return username, None
+                delay = self.get_request_delay() * 2
+                self.wait(delay)
+                if is_inner_processing:
+                    return channel, ProcessingStatus.PASS
+                return channel, ProcessingStatus.FAIL
             else:
                 full_data, full_data_raw = full_data
                 channel_id = full_data.channel_id
-
-                if channel_id == username:  # if from local queue
-                    if is_done(full_data.username, self.db_session_cls):
-                        return full_data.username, None
-
                 username = full_data.username
-                self.logger.info(
-                    "Got channel full - username: {}, id: {}".format(
-                        full_data.username, channel_id))
+                self.logger.info("Got channel full - username: {}, id: {}"
+                                 .format(username, channel_id))
+
+                if is_inner_processing:
+                    if is_done(username, self.db_session_cls):
+                        self.logger.info("Channel from inner queue is already done")
+                        delay = self.get_request_delay() * 2
+                        self.wait(delay)
+                        return username, ProcessingStatus.PASS
+                    else:
+                        send_status_to_queue(username, "processing", self.db_session_cls)
+                        self.logger.debug("Set status 'processing' to channel from inner queue")
+
                 self.save_to_json(full_data_raw, "full", channel_id)
 
             self.wait()
@@ -207,7 +201,9 @@ class Crawler():
             if _pc < self.min_participants_count:
                 self.logger.info(
                     'Small channel, {} participants, pass it'.format(_pc))
-                return username, ProcessingStatus.FAIL  # small
+                delay = self.get_request_delay() * 2
+                self.wait(delay)
+                return username, ProcessingStatus.FAIL
 
             ########## MEDIA ##########
             self.logger.debug('Run channel media counts extraction')
@@ -222,7 +218,6 @@ class Crawler():
 
             save_header(full_data, media_data, self.db_session_cls)
             self.logger.debug("Header saved to db")
-
             self.wait()
 
             ########## CHAT ##########
@@ -463,13 +458,16 @@ class Crawler():
 
     def notify(self, message: str, chat="telemap_ctitical"):
         """ send `message` (notification) to chat """
-        if not self.chat_member:
-            self.chat_member = True
-            self.client(JoinChannelRequest(chat))
-            self.logger.debug("Joined to chat")
+        try:
+            if not self.chat_member:
+                self.chat_member = True
+                self.client(JoinChannelRequest(chat))
+                self.logger.debug("Joined to chat")
 
-        self.client.send_message(chat, message)
-        self.logger.debug("Sended message '{}' to chat".format(message))
+            self.client.send_message(chat, message)
+            self.logger.debug("Sent message '{}' to chat".format(message))
+        except:
+            self.logger.debug("Cannot send notification to chat")
 
     @staticmethod
     def json_serial(obj):
