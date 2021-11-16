@@ -34,8 +34,10 @@ from core.utils import (
     save_relations,
     send_status_to_queue,
     is_done,
+    is_ok,
     get_channel_from_db
 )
+from core.utils.web import extract_subscribers
 
 
 class Crawler():
@@ -171,6 +173,23 @@ class Crawler():
         try:
             start_time = time()
             self.logger.debug("Started iteration for {}".format(channel))
+
+            ########## WEB & is_ok CHECK ##########
+            # TODO debug
+            if is_inner_processing:
+                if is_ok(channel_id=channel, session_cls=self.db_session_cls):
+                    self.logger.info("Channel already ok")
+                    return channel, ProcessingStatus.PASS
+            else:
+                number_of_subscribers = extract_subscribers(channel)
+                if number_of_subscribers == -1:
+                    self.logger.info("Cant get channel subscribers in web, pass it")
+                    return channel, ProcessingStatus.FAIL
+                elif number_of_subscribers < self.min_participants_count:
+                    self.logger.info(
+                        "Web: small channel, {} participants, pass it"
+                        .format(number_of_subscribers))
+                    return channel, ProcessingStatus.FAIL
 
             ########## FULL ##########
             self.logger.debug("Run channel full extraction")

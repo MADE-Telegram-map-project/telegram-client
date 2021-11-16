@@ -1,6 +1,7 @@
 from typing import Union, List
 
 from sqlalchemy.orm import Session
+from sqlalchemy.sql.functions import user
 
 from core.entities import (
     FullChannelData, MediaChannelData, ChannelRelationData,
@@ -189,3 +190,23 @@ def get_channel_from_db(session_cls: Session) -> Union[str, None]:
 
         session.commit()
     return username
+
+
+def is_ok(
+        session_cls: Session,
+        username: Union[str, None] = None,
+        channel_id: Union[int, None] = None) -> bool:
+    assert any((username, channel_id)), "need channel username or id"
+
+    with session_cls() as session:
+        if username is not None:
+            record = session.query(Channels).filter(
+                Channels.link == username).first()
+
+        elif channel_id is not None:
+            record = session.query(Channels).filter(
+                Channels.channel_id == channel_id).first()
+
+        if record is not None:
+            return True
+    return False

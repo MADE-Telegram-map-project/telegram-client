@@ -1,0 +1,5 @@
+user: ${oc.env:POSTGRES_USER_REMOTE}
+passw: ${oc.env:POSTGRES_PASS_REMOTE}
+host: ${oc.env:POSTGRES_HOST_REMOTE}
+port: ${oc.env:POSTGRES_PORT_REMOTE,5432}
+db_url: postgresql+psycopg2://${.user}:${.passw}@${.host}:${.port}/${.user}

@@ -1,4 +1,4 @@
-from .config.configs import ClientConfigSchema, AppConfig
+from .config.configs import ClientConfigSchema, DbConfigSchema, AppConfig
 from .data.datas import (
     FullChannelData,
     MediaChannelData,
@@ -11,12 +11,13 @@ from .statuses import ProcessingStatus
 
 __all__ = [
     "ClientConfigSchema",
+    "DbConfigSchema",
+    "AppConfig",
     "FullChannelData",
     "MediaChannelData",
     "MessageData",
     "UserData",
     "ReplyData",
-    "AppConfig",
     "ChannelRelationData",
     "ProcessingStatus",
 ]
