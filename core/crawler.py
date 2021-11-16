@@ -34,8 +34,10 @@ from core.utils import (
     save_relations,
     send_status_to_queue,
     is_done,
+    is_ok,
     get_channel_from_db
 )
+from core.utils.web import extract_subscribers
 
 
 class Crawler():
@@ -67,6 +69,7 @@ class Crawler():
             activate_logging=True,
             logging_config_path="configs/logger_config.yml",
             dump_path="data/raw",
+            local_queue_dump_path="data/local_queue.json",
     ):
         '''
         read config values, create logger and
@@ -81,6 +84,7 @@ class Crawler():
         self.config = config
         self.client = self.__authorize()
         self.dump_path = dump_path
+        self.local_queue_dump_path = local_queue_dump_path
         self.successful = 0
         self.chat_member = False
         engine = create_engine(
@@ -92,8 +96,8 @@ class Crawler():
         engine_ser = engine.execution_options(isolation_level='SERIALIZABLE')
         self.db_session_cls = sessionmaker(bind=engine)
         self.db_session_cls_ser = sessionmaker(bind=engine_ser)
-        self.local_queue = Queue()
-        # self.local_queue.put(1149710531)
+        self.__load_local_queue()
+        # self.local_queue.add(1443326813)
 
     def __authorize(self):
         client = TelegramClient(
@@ -129,8 +133,8 @@ class Crawler():
         n_passes = 0
         while n_passes < self.max_passes_num:
             try:
-                if not self.local_queue.empty() and random.random() > self.qcutoff:
-                    username = self.local_queue.get()
+                if len(self.local_queue) > 0 and random.random() > self.qcutoff:
+                    username = self.local_queue.pop()
                     self.logger.info("Got channel id {} from local queue".format(username))
                 else:
                     username = get_channel_from_db(self.db_session_cls_ser)
@@ -171,6 +175,22 @@ class Crawler():
         try:
             start_time = time()
             self.logger.debug("Started iteration for {}".format(channel))
+
+            ########## WEB & is_ok CHECK ##########
+            if is_inner_processing:
+                if is_ok(channel_id=channel, session_cls=self.db_session_cls):
+                    self.logger.info("Channel already ok")
+                    return channel, ProcessingStatus.PASS
+            else:
+                number_of_subscribers = extract_subscribers(channel)
+                if number_of_subscribers == -1:
+                    self.logger.info("Cannot get channel subscribers in web, pass it")
+                    return channel, ProcessingStatus.FAIL
+                elif number_of_subscribers < self.min_participants_count:
+                    self.logger.info(
+                        "Web: small channel, {} participants, pass it"
+                        .format(number_of_subscribers))
+                    return channel, ProcessingStatus.FAIL
 
             ########## FULL ##########
             self.logger.debug("Run channel full extraction")
@@ -215,7 +235,7 @@ class Crawler():
             media_data = self.get_header_media_counts(channel_id)
             if media_data is None:
                 self.logger.error("Cannot get channel media counts, continue crawling")
-                media_data = (MediaChannelData(), None)  # default zeros
+                media_data = MediaChannelData()  # default zeros
             else:
                 self.logger.debug("Media counts extracted")
                 media_data, media_data_raw = media_data
@@ -232,6 +252,7 @@ class Crawler():
                                   .format(full_data.linked_chat_id))
                 chat_users = self.get_linked_chat_members(
                     channel_id, full_data.linked_chat_id)
+
                 if chat_users is None:
                     self.logger.error("Cannot get linked chat users, continue crawling")
                 else:
@@ -269,8 +290,9 @@ class Crawler():
             self.logger.debug("Extracted {} new fwd channel ids".format(nfwd))
             for rel in relations:
                 if rel.type == "forward":
-                    self.local_queue.put(rel.to_channel_id)
+                    self.local_queue.add(rel.to_channel_id)
             self.logger.debug("Fwd channel ids put to local queue")
+            self.save_local_queue()
 
             save_relations(relations, self.db_session_cls)
             self.logger.debug("Relations saved to db and usernames added to queue")
@@ -283,7 +305,7 @@ class Crawler():
             return username, ProcessingStatus.SUCCESS
 
         except Exception as e:
-            error_msg = repr(e)
+            error_msg = "Parsing error: {}".format(repr(e))
             self.logger.critical(error_msg)
             self.notify(error_msg)
             return username, ProcessingStatus.FAIL
@@ -497,3 +519,20 @@ class Crawler():
         if to_log:
             self.logger.debug('Going to sleep for {} sec'.format(str(delay)))
         sleep(delay)
+
+    def save_local_queue(self):
+        self.logger.debug("Local queue size = {}".format(len(self.local_queue)))
+        with open(self.local_queue_dump_path, 'w') as fout:
+            json.dump(list(self.local_queue), fout)
+        self.logger.debug("Local queue dumped")
+    
+    def __load_local_queue(self):
+        if os.path.exists(self.local_queue_dump_path):
+            with open(self.local_queue_dump_path) as fin:
+                queue = json.load(fin)
+                self.local_queue = set(queue)
+            self.logger.debug("Local queue loaded. Queue size = {}".format(
+                len(self.local_queue)))
+        else:
+            self.logger.debug("Local queue dump doesn't exist")
+            self.local_queue = set()

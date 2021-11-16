@@ -13,6 +13,7 @@ from telethon.tl.types import (
 )
 
 from core.entities import ChannelRelationData
+from core.utils.web import extract_subscribers
 
 about = '''
 Такую латынь ты по учебникам не выучишь.\n
@@ -66,6 +67,7 @@ def extract_usernames_from_text(text: str) -> List[str]:
 
     links_raw = re.findall(link_pattern, text)
     links = [l.lstrip("t.me/") for l in links_raw if "joinchat" not in l]
+    links = [l for l in links if not l.lower().endswith("bot")]
 
     potential_channels = usernames + links
     return potential_channels
@@ -81,7 +83,8 @@ def extract_usernames_from_entities(msg: Message) -> List[str]:
         try:
             if isinstance(ent, MessageEntityMention):
                 username = text[ent.offset + 1:ent.offset + ent.length]
-                usernames.append(username)
+                if not username.lower().endswith("bot"):
+                    usernames.append(username)
 
             elif isinstance(ent, MessageEntityTextUrl):
                 links = extract_usernames_from_text(ent.url + ' ')
@@ -141,17 +144,19 @@ def extract_usernames(
     
     relations = []
     for uname in head_usernames:
-        relations.append(ChannelRelationData(
-            channel_id,
-            to_channel_link=uname,
-            type="header", 
-        ))
+        if extract_subscribers(uname) != -1:  # check that username is channel
+            relations.append(ChannelRelationData(
+                channel_id,
+                to_channel_link=uname,
+                type="header", 
+            ))
     for uname in direct_usernames:
-        relations.append(ChannelRelationData(
-            channel_id,
-            to_channel_link=uname,
-            type="direct", 
-        ))
+        if extract_subscribers(uname) != -1:  # check that username is channel
+            relations.append(ChannelRelationData(
+                channel_id,
+                to_channel_link=uname,
+                type="direct", 
+            ))
     for idx in fwd_ids:
         relations.append(ChannelRelationData(
             channel_id,
@@ -163,4 +168,9 @@ def extract_usernames(
 
 
 if __name__ == "__main__":
-    extract_usernames_from_text(about)
+    unames = extract_usernames_from_text(about)
+    print(unames)
+
+    rels, _, _, _ = extract_usernames(1149710531, about, [])
+    for r in rels:
+        print(r)
