@@ -13,6 +13,7 @@ from telethon.tl.types import (
 )
 
 from core.entities import ChannelRelationData
+from core.utils.web import extract_subscribers
 
 about = '''
 Такую латынь ты по учебникам не выучишь.\n

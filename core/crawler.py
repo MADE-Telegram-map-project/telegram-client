@@ -183,7 +183,7 @@ class Crawler():
             else:
                 number_of_subscribers = extract_subscribers(channel)
                 if number_of_subscribers == -1:
-                    self.logger.info("Cant get channel subscribers in web, pass it")
+                    self.logger.info("Cannot get channel subscribers in web, pass it")
                     return channel, ProcessingStatus.FAIL
                 elif number_of_subscribers < self.min_participants_count:
                     self.logger.info(
@@ -234,7 +234,7 @@ class Crawler():
             media_data = self.get_header_media_counts(channel_id)
             if media_data is None:
                 self.logger.error("Cannot get channel media counts, continue crawling")
-                media_data = (MediaChannelData(), None)  # default zeros
+                media_data = MediaChannelData()  # default zeros
             else:
                 self.logger.debug("Media counts extracted")
                 media_data, media_data_raw = media_data
@@ -251,6 +251,7 @@ class Crawler():
                                   .format(full_data.linked_chat_id))
                 chat_users = self.get_linked_chat_members(
                     channel_id, full_data.linked_chat_id)
+
                 if chat_users is None:
                     self.logger.error("Cannot get linked chat users, continue crawling")
                 else:
@@ -302,7 +303,7 @@ class Crawler():
             return username, ProcessingStatus.SUCCESS
 
         except Exception as e:
-            error_msg = repr(e)
+            error_msg = "Parsing error: {}".format(repr(e))
             self.logger.critical(error_msg)
             self.notify(error_msg)
             return username, ProcessingStatus.FAIL
