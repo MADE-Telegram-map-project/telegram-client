@@ -142,17 +142,19 @@ def extract_usernames(
     
     relations = []
     for uname in head_usernames:
-        relations.append(ChannelRelationData(
-            channel_id,
-            to_channel_link=uname,
-            type="header", 
-        ))
+        if extract_subscribers(uname) != -1:  # check that username is channel
+            relations.append(ChannelRelationData(
+                channel_id,
+                to_channel_link=uname,
+                type="header", 
+            ))
     for uname in direct_usernames:
-        relations.append(ChannelRelationData(
-            channel_id,
-            to_channel_link=uname,
-            type="direct", 
-        ))
+        if extract_subscribers(uname) != -1:  # check that username is channel
+            relations.append(ChannelRelationData(
+                channel_id,
+                to_channel_link=uname,
+                type="direct", 
+            ))
     for idx in fwd_ids:
         relations.append(ChannelRelationData(
             channel_id,
@@ -164,4 +166,9 @@ def extract_usernames(
 
 
 if __name__ == "__main__":
-    extract_usernames_from_text(about)
+    unames = extract_usernames_from_text(about)
+    print(unames)
+
+    rels, _, _, _ = extract_usernames(1149710531, about, [])
+    for r in rels:
+        print(r)

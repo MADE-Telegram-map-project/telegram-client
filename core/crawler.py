@@ -69,6 +69,7 @@ class Crawler():
             activate_logging=True,
             logging_config_path="configs/logger_config.yml",
             dump_path="data/raw",
+            local_queue_dump_path="data/local_queue.json",
     ):
         '''
         read config values, create logger and
@@ -83,6 +84,7 @@ class Crawler():
         self.config = config
         self.client = self.__authorize()
         self.dump_path = dump_path
+        self.local_queue_dump_path = local_queue_dump_path
         self.successful = 0
         self.chat_member = False
         engine = create_engine(
@@ -94,8 +96,8 @@ class Crawler():
         engine_ser = engine.execution_options(isolation_level='SERIALIZABLE')
         self.db_session_cls = sessionmaker(bind=engine)
         self.db_session_cls_ser = sessionmaker(bind=engine_ser)
-        self.local_queue = Queue()
-        # self.local_queue.put(1149710531)
+        self.__load_local_queue()
+        # self.local_queue.add(1443326813)
 
     def __authorize(self):
         client = TelegramClient(
@@ -131,8 +133,8 @@ class Crawler():
         n_passes = 0
         while n_passes < self.max_passes_num:
             try:
-                if not self.local_queue.empty() and random.random() > self.qcutoff:
-                    username = self.local_queue.get()
+                if len(self.local_queue) > 0 and random.random() > self.qcutoff:
+                    username = self.local_queue.pop()
                     self.logger.info("Got channel id {} from local queue".format(username))
                 else:
                     username = get_channel_from_db(self.db_session_cls_ser)
@@ -175,7 +177,6 @@ class Crawler():
             self.logger.debug("Started iteration for {}".format(channel))
 
             ########## WEB & is_ok CHECK ##########
-            # TODO debug
             if is_inner_processing:
                 if is_ok(channel_id=channel, session_cls=self.db_session_cls):
                     self.logger.info("Channel already ok")
@@ -289,8 +290,9 @@ class Crawler():
             self.logger.debug("Extracted {} new fwd channel ids".format(nfwd))
             for rel in relations:
                 if rel.type == "forward":
-                    self.local_queue.put(rel.to_channel_id)
+                    self.local_queue.add(rel.to_channel_id)
             self.logger.debug("Fwd channel ids put to local queue")
+            self.save_local_queue()
 
             save_relations(relations, self.db_session_cls)
             self.logger.debug("Relations saved to db and usernames added to queue")
@@ -517,3 +519,20 @@ class Crawler():
         if to_log:
             self.logger.debug('Going to sleep for {} sec'.format(str(delay)))
         sleep(delay)
+
+    def save_local_queue(self):
+        self.logger.debug("Local queue size = {}".format(len(self.local_queue)))
+        with open(self.local_queue_dump_path, 'w') as fout:
+            json.dump(list(self.local_queue), fout)
+        self.logger.debug("Local queue dumped")
+    
+    def __load_local_queue(self):
+        if os.path.exists(self.local_queue_dump_path):
+            with open(self.local_queue_dump_path) as fin:
+                queue = json.load(fin)
+                self.local_queue = set(queue)
+            self.logger.debug("Local queue loaded. Queue size = {}".format(
+                len(self.local_queue)))
+        else:
+            self.logger.debug("Local queue dump doesn't exist")
+            self.local_queue = set()
