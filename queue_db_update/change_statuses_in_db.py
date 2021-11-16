@@ -65,7 +65,7 @@ def update_db_queue(new_statuses: dict, session_cls: Session):
                 .update({"status": status})
             session.commit()
 
-def cancel_processiong(session_cls: Session):
+def cancel_processing(session_cls: Session):
     with session_cls() as session:
         session.query(ChannelQueue)\
             .filter(ChannelQueue.status == "processing")\
