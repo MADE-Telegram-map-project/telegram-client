@@ -9,6 +9,7 @@ from telethon.errors import (
     RpcMcgetFailError,
     UsernameInvalidError,
     UsernameNotOccupiedError,
+    ChatAdminRequiredError,
     # MsgIdInvalidError,
 )
 
@@ -84,7 +85,10 @@ def cool_exceptor(func):
                     self.logger.critical("Weird runtime error \n" + str(e))
                     self.notify("Weird runtime error \n" + repr(e))
                     status = "error"
-            except Exception as e:  # ok, it seems like
+            except ChatAdminRequiredError as e:
+                self.logger.warn("Chat is private")
+                status = "error"
+            except Exception as e:
                 error_msg = "it seems like it's over for now; {}".format(repr(e))
                 self.logger.critical(error_msg)
                 self.notify(error_msg)

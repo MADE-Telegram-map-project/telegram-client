@@ -146,23 +146,33 @@ class Crawler():
                     self.logger.info("Got username {} from db".format(username))
 
                 channel_username, status = self.parse_channel(username)
-                if status == ProcessingStatus.SUCCESS:
-                    n_passes = 0
-                    send_status_to_queue(
-                        channel_username, "ok", self.db_session_cls)
-                    self.logger.debug("Sent 'ok' to db-queue")
-                elif status == ProcessingStatus.FAIL:
-                    n_passes = 0
-                    send_status_to_queue(
-                        channel_username, "error", self.db_session_cls)
-                    self.logger.debug("Sent 'error' to db-queue")
+                self.logger.debug("Sending status to db-queue")
+                for _ in range(3):  # num of attempts
+                    try:
+                        if status == ProcessingStatus.SUCCESS:
+                            n_passes = 0
+                            send_status_to_queue(
+                                channel_username, "ok", self.db_session_cls)
+                            self.logger.debug("Sent 'ok' to db-queue")
+                        elif status == ProcessingStatus.FAIL:
+                            n_passes = 0
+                            send_status_to_queue(
+                                channel_username, "error", self.db_session_cls)
+                            self.logger.debug("Sent 'error' to db-queue")
+                        break
+                    except Exception as e:
+                        self.logger.warn(
+                            "Error in sending status to db-queue: {}".format(repr(e)))
+                        self.wait(10)
+
 
                 self.logger.debug("Channel {} processed with {}"
                                 .format(channel_username, str(status)))
             
             except Exception as e:
-                self.logger.critical("Global error: {}".format(repr(e)))
-                self.notify(repr(e))
+                error_message = "Global error: {}".format(repr(e))
+                self.logger.critical(error_message)
+                self.notify(error_message)
         self.end_parsing()
 
     def parse_channel(
@@ -218,6 +228,12 @@ class Crawler():
                     else:
                         send_status_to_queue(username, "processing", self.db_session_cls)
                         self.logger.debug("Set status 'processing' to channel from inner queue")
+                else:
+                    if is_ok(self.db_session_cls, channel_id=channel_id):
+                        self.logger.info("Channel from common queue is already ok")
+                        delay = self.get_request_delay() * 2
+                        self.wait(delay)
+                        return username, ProcessingStatus.FAIL
 
                 self.save_to_json(full_data_raw, "full", channel_id)
 

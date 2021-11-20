@@ -162,18 +162,18 @@ def send_status_to_queue(username: str, status: str, session_cls: Session):
         session.commit()
 
 
-def is_done(username: str, session_cls: Session) -> bool:
+def is_ready_to_process(username: str, session_cls: Session) -> bool:
     with session_cls() as session:
         record = session.query(ChannelQueue).filter(
             ChannelQueue.channel_link == username,
-            ChannelQueue.status.in_(["ok", "error"])).first()
+            ChannelQueue.status == "to_process").first()
         if record is not None:
             return True
     return False
 
 
-def is_ready_to_process(username: str, session_cls: Session) -> bool:
-    return not is_done(username, session_cls)
+def is_done(username: str, session_cls: Session) -> bool:
+    return not is_ready_to_process(username, session_cls)
 
 
 def get_channel_from_db(session_cls: Session) -> Union[str, None]:
