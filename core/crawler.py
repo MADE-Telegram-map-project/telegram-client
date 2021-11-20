@@ -22,9 +22,11 @@ from telethon.tl.functions.messages import (GetRepliesRequest,
                                             GetSearchCountersRequest)
 from telethon.tl.types import InputPeerChannel, PeerChannel, TLObject
 from telethon.tl.types.messages import ChannelMessages, ChatFull, SearchCounter
+from core.db_seed.db.channel_rel import ChannelRelation
 
 from core.entities import (AppConfig, FullChannelData, MediaChannelData,
                            MessageData, ReplyData, UserData, ProcessingStatus)
+from core.entities.data.datas import ChannelRelationData
 from core.utils import (
     cool_exceptor,
     extract_usernames,
@@ -304,13 +306,10 @@ class Crawler():
             self.logger.debug("Extracted {} new head usernames".format(nhead))
             self.logger.debug("Extracted {} new direct usernames".format(ndirect))
             self.logger.debug("Extracted {} new fwd channel ids".format(nfwd))
-            for rel in relations:
-                if rel.type == "forward":
-                    self.local_queue.add(rel.to_channel_id)
-            self.logger.debug("Fwd channel ids put to local queue")
+            # self.fill_local_queue(relations)
             self.save_local_queue()
 
-            save_relations(relations, self.db_session_cls)
+            save_relations(relations, self.db_session_cls, False)
             self.logger.debug("Relations saved to db and usernames added to queue")
 
             self.successful += 1
@@ -552,3 +551,9 @@ class Crawler():
         else:
             self.logger.debug("Local queue dump doesn't exist")
             self.local_queue = set()
+    
+    def fill_local_queue(self, relations: ChannelRelationData):
+        for rel in relations:
+            if rel.type == "forward":
+                self.local_queue.add(rel.to_channel_id)
+        self.logger.debug("Fwd channel ids put to local queue")
