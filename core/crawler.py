@@ -235,11 +235,10 @@ class Crawler():
                         self.logger.info("Channel from common queue is already ok")
                         delay = self.get_request_delay() * 2
                         self.wait(delay)
-                        return username, ProcessingStatus.PASS
+                        return username, ProcessingStatus.SUCCESS
 
                 self.save_to_json(full_data_raw, "full", channel_id)
 
-            self.wait()
             _pc = full_data.participants_count
             if _pc < self.min_participants_count:
                 self.logger.info(
@@ -247,6 +246,7 @@ class Crawler():
                 delay = self.get_request_delay() * 2
                 self.wait(delay)
                 return username, ProcessingStatus.FAIL
+            self.wait()
 
             ########## MEDIA ##########
             self.logger.debug('Run channel media counts extraction')
