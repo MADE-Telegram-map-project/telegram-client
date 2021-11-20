@@ -113,7 +113,8 @@ def save_replies(replies: List[ReplyData], session_cls: Session):
     return
 
 
-def save_relations(relations: List[ChannelRelationData], session_cls: Session):
+def save_relations(
+    relations: List[ChannelRelationData], session_cls: Session, add_to_queue=False):
     """ add channel usernames to queue & add pair of connected channels to db """
     with session_cls() as session:
         for rel in relations:
@@ -138,12 +139,13 @@ def save_relations(relations: List[ChannelRelationData], session_cls: Session):
                 # db queue only for links (usernames)
                 continue
 
-            record = session.query(ChannelQueue).filter(
-                ChannelQueue.channel_link == rel.to_channel_link).first()
-            if record is None:
-                session.add(ChannelQueue(
-                    channel_link=rel.to_channel_link, status="to_process"))
-                session.commit()
+            if add_to_queue:
+                record = session.query(ChannelQueue).filter(
+                    ChannelQueue.channel_link == rel.to_channel_link).first()
+                if record is None:
+                    session.add(ChannelQueue(
+                        channel_link=rel.to_channel_link, status="to_process"))
+                    session.commit()
     return
 
 
