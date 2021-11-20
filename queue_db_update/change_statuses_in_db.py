@@ -84,10 +84,11 @@ def main(config: DbConfigSchema):
     session_cls = sessionmaker(bind=engine)
     session_cls_ser = sessionmaker(bind=engine_ser)
 
-    for _ in range(EPOCHS):
-        usernames = get_channels(session_cls_ser)
-        new_statuses = check_usernames(usernames)
-        update_db_queue(new_statuses, session_cls)
+    cancel_processing(session_cls)
+    # for _ in range(EPOCHS):
+    #     usernames = get_channels(session_cls_ser)
+    #     new_statuses = check_usernames(usernames)
+    #     update_db_queue(new_statuses, session_cls)
 
 
 def load_config() -> DbConfigSchema:

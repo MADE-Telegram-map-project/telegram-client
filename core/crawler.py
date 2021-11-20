@@ -235,7 +235,7 @@ class Crawler():
                         self.logger.info("Channel from common queue is already ok")
                         delay = self.get_request_delay() * 2
                         self.wait(delay)
-                        return username, ProcessingStatus.FAIL
+                        return username, ProcessingStatus.PASS
 
                 self.save_to_json(full_data_raw, "full", channel_id)
 
