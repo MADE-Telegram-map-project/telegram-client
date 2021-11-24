@@ -53,8 +53,8 @@ class Crawler():
     messages_limit = 500
     min_delay = 40
     max_delay = 70
-    qcutoff = 0.5  # frequency of using of local queue
-    max_passes_num = 50
+    qcutoff = 0.1  # frequency of using of common queue
+    max_passes_num = 100
     media_filters = [
         types.InputMessagesFilterPhotos(),
         types.InputMessagesFilterVideo(),
@@ -149,15 +149,14 @@ class Crawler():
 
                 channel_username, status = self.parse_channel(username)
                 self.logger.debug("Sending status to db-queue")
+                n_passes = 0
                 for _ in range(3):  # num of attempts
                     try:
                         if status == ProcessingStatus.SUCCESS:
-                            n_passes = 0
                             send_status_to_queue(
                                 channel_username, "ok", self.db_session_cls)
                             self.logger.debug("Sent 'ok' to db-queue")
                         elif status == ProcessingStatus.FAIL:
-                            n_passes = 0
                             send_status_to_queue(
                                 channel_username, "error", self.db_session_cls)
                             self.logger.debug("Sent 'error' to db-queue")
