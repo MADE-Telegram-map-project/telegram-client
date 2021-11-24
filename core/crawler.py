@@ -150,6 +150,7 @@ class Crawler():
                 channel_username, status = self.parse_channel(username)
                 self.logger.debug("Sending status to db-queue")
                 n_passes = 0
+                self.save_local_queue()
                 for _ in range(3):  # num of attempts
                     try:
                         if status == ProcessingStatus.SUCCESS:
